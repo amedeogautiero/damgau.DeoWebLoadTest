@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>LoadTest.Sdk</RootNamespace>
+  </PropertyGroup>
+</Project>
