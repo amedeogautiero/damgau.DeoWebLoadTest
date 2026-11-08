@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>LoadTest.Metrics</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- versione da verificare al primo restore (rete non disponibile quando scritto) -->
+    <PackageReference Include="HdrHistogram" Version="2.5.0" />
+  </ItemGroup>
+</Project>
