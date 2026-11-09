@@ -92,6 +92,7 @@ public class LoadTestingTests
         Assert.Equal(10, p.GetUserCount(TimeSpan.Zero, s));
         Assert.Equal(10, p.GetUserCount(TimeSpan.FromSeconds(59), s));
         //Assert.Equal(30, p.GetUserCount(TimeSpan.FromSeconds(120), s));
+        Assert.Equal(30, p.GetUserCount(TimeSpan.FromSeconds(60), s));
         Assert.Equal(50, p.GetUserCount(TimeSpan.FromSeconds(120), s));
         Assert.Equal(50, p.GetUserCount(TimeSpan.FromHours(1), s));
     }

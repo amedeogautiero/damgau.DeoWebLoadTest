@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>LoadTest.Plugins.Compilation</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- versione da verificare al primo restore (rete non disponibile quando scritto) -->
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.0.0" />
+    <ProjectReference Include="..\LoadTest.Plugins\LoadTest.Plugins.csproj" />
+  </ItemGroup>
+</Project>
