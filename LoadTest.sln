@@ -12,8 +12,6 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "LoadTest.Metrics", "src\Loa
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "LoadTest.Reports", "src\LoadTest.Reports\LoadTest.Reports.csproj", "{55555555-5555-5555-5555-555555555555}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "LoadTest.Reports.Tests", "tests\LoadTest.Reports.Tests\LoadTest.Reports.Tests.csproj", "{66666666-6666-6666-6666-666666666666}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LoadTest.Plugins", "src\LoadTest.Plugins\LoadTest.Plugins.csproj", "{A4040E96-8373-92AE-1E61-F330ABE69BAF}"
 EndProject
 Global
@@ -42,10 +40,6 @@ Global
 		{55555555-5555-5555-5555-555555555555}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{55555555-5555-5555-5555-555555555555}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{55555555-5555-5555-5555-555555555555}.Release|Any CPU.Build.0 = Release|Any CPU
-		{66666666-6666-6666-6666-666666666666}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{66666666-6666-6666-6666-666666666666}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{66666666-6666-6666-6666-666666666666}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{66666666-6666-6666-6666-666666666666}.Release|Any CPU.Build.0 = Release|Any CPU
 		{A4040E96-8373-92AE-1E61-F330ABE69BAF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{A4040E96-8373-92AE-1E61-F330ABE69BAF}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A4040E96-8373-92AE-1E61-F330ABE69BAF}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -53,5 +47,8 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {982CD2CD-3D95-4B31-B384-72E43B0201F4}
 	EndGlobalSection
 EndGlobal
