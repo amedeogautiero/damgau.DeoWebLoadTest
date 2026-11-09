@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>LoadTest.Reports</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- versione da verificare al primo restore (rete non disponibile quando scritto) -->
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.0" />
+    <!-- Microsoft.Data.Sqlite 10.0.0 porta SQLitePCLRaw.lib.e_sqlite3 2.1.11 (SQLite 3.49.1), colpito da GHSA-2m69-gcr7-jv3q (SQLite < 3.50.2).
+         Riferimento diretto al solo binario nativo 3.50.3 (nessuna dipendenza gestita): sostituisce quello transitivo.
+         Da rimuovere quando Microsoft.Data.Sqlite porta di suo un binario >= 3.50.2. -->
+    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.50.3" />
+    <ProjectReference Include="..\LoadTest.Metrics\LoadTest.Metrics.csproj" />
+  </ItemGroup>
+</Project>
