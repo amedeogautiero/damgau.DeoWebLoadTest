@@ -5,6 +5,8 @@
   <ItemGroup>
     <PackageReference Include="YamlDotNet" Version="16.3.0" />
     <ProjectReference Include="..\LoadTest.Sdk\LoadTest.Sdk.csproj" />
-    <!-- Roslyn (Microsoft.CodeAnalysis.CSharp) arriva nella fase 2 (.csx), solo lato controller -->
+    <!-- Parte 3: l'integrazione usa ICodeStepHost, EngineServices, RuleRegistry e le definizioni dei test (PROPOSTA P4/P13) -->
+    <ProjectReference Include="..\LoadTest.Engine\LoadTest.Engine.csproj" />
+    <!-- Roslyn sta in LoadTest.Plugins.Compilation, solo lato controller -->
   </ItemGroup>
 </Project>

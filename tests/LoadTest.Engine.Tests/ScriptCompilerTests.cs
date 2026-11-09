@@ -1,7 +1,8 @@
+using LoadTest.Plugins;
 using LoadTest.Plugins.Compilation;
 using LoadTest.Sdk;
 
-namespace LoadTest.Plugins.Tests;
+namespace LoadTest.Engine.Tests;
 
 public class ScriptCompilerTests
 {

@@ -336,3 +336,15 @@ Stato: `TODO`, `WIP`, `OK`. Chat: numero della tabella della sezione 2.
 | Esecuzione | CLI e integrazione CI | 6 | TODO |
 | Esecuzione | Estensione VS Code | 8 | TODO |
 | Nuove | Agenti multipiattaforma (Linux, macOS, Raspberry), cache plugin per hash | 6 | TODO |
+
+## 11. Unit-Test
+tutti i test devono essere messi nel progetto tests/LoadTest.Engine.Tests
+
+## 12 Rilasci odegli zip
+tutti i rilasci dei file tramite zip decono ricostruire la struttura \src\{nome_progetto}
+    - LoadTest.Engine
+    - LoadTest.Metrics
+    - LoadTest.Plugins
+    - LoadTest.Plugins.Compilation
+    - LoadTest.Reports
+    - LoadTest.Sdk
