@@ -1,3 +1,5 @@
+using LoadTest.Engine.Model;
+
 namespace LoadTest.Plugins;
 
 /// <summary>Carica i pacchetti del catalogo una sola volta e istanzia i tipi per kind. Le istanze create sono nuove a ogni chiamata.</summary>
