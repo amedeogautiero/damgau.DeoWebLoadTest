@@ -338,13 +338,13 @@ Stato: `TODO`, `WIP`, `OK`. Chat: numero della tabella della sezione 2.
 | Nuove | Agenti multipiattaforma (Linux, macOS, Raspberry), cache plugin per hash | 6 | TODO |
 
 ## 11. Unit-Test
-tutti i test devono essere messi nel progetto tests/LoadTest.Engine.Tests
+tutti i test devono essere messi nel progetto .tests\LoadTest.Engine.Tests
 
 ## 12 Rilasci odegli zip
-tutti i rilasci dei file tramite zip decono ricostruire la struttura \src\{nome_progetto}
-    - LoadTest.Engine
-    - LoadTest.Metrics
-    - LoadTest.Plugins
-    - LoadTest.Plugins.Compilation
-    - LoadTest.Reports
-    - LoadTest.Sdk
+tutti i rilasci dei file tramite zip decono ricostruire la struttura .\src\{nome_progetto}
+    - .\src\LoadTest.Engine
+    - .\src\LoadTest.Metrics
+    - .\src\LoadTest.Plugins
+    - .\src\LoadTest.Plugins.Compilation
+    - .\src\LoadTest.Reports
+    - .\src\LoadTest.Sdk
