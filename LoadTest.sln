@@ -18,6 +18,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LoadTest.Plugins.Compilatio
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LoadTest.Protocol", "src\LoadTest.Protocol\LoadTest.Protocol.csproj", "{49D2E560-83A5-C1E2-F999-95FBA3FCD000}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LoadTest.Agent", "src\LoadTest.Agent\LoadTest.Agent.csproj", "{4D9B8080-6EEF-7E57-659E-E8481812D4B1}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -56,6 +58,10 @@ Global
 		{49D2E560-83A5-C1E2-F999-95FBA3FCD000}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{49D2E560-83A5-C1E2-F999-95FBA3FCD000}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{49D2E560-83A5-C1E2-F999-95FBA3FCD000}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4D9B8080-6EEF-7E57-659E-E8481812D4B1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4D9B8080-6EEF-7E57-659E-E8481812D4B1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4D9B8080-6EEF-7E57-659E-E8481812D4B1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4D9B8080-6EEF-7E57-659E-E8481812D4B1}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
