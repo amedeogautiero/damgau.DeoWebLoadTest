@@ -1,0 +1,244 @@
+// Protocollo controller-agente (CONTRATTO.md v0.1, sez. 7).
+// Le parti del contratto (servizio, oneof, nomi e numeri dei campi di primo livello) sono rispettate alla lettera.
+// I campi interni dei messaggi NON sono definiti dal contratto: sono PROPOSTA-CONTRATTO (vedi PROPOSTE-CONTRATTO-chat6.md, G2).
+//
+// Flusso (PROPOSTA):
+//   agente -> Hello            controller -> Welcome (accepted=false: il controller chiude lo stream)
+//   controller -> PrepareRun   agente -> PackageRequest (solo hash mancanti) ; controller -> PackageChunk*
+//   agente -> Ready            controller -> StartRun (start_at_utc sincronizzato)
+//   durante la run: agente -> MetricsBatch / ErrorBatch / Heartbeat ; controller -> UpdateLoad / Stop
+//   fine: agente -> Finished
+syntax = "proto3";
+
+package loadtest.protocol;
+
+option csharp_namespace = "LoadTest.Protocol";
+
+import "google/protobuf/timestamp.proto";
+
+service AgentLink {
+  rpc Connect (stream AgentMsg) returns (stream ControllerMsg);
+}
+
+message AgentMsg {
+  oneof m {
+    Hello hello = 1;
+    PackageRequest need = 2;
+    Ready ready = 3;
+    MetricsBatch metrics = 4;
+    ErrorBatch errors = 5;
+    Heartbeat hb = 6;
+    Finished finished = 7;
+  }
+}
+
+message ControllerMsg {
+  oneof m {
+    Welcome welcome = 1;
+    PrepareRun prepare = 2;
+    PackageChunk chunk = 3;
+    StartRun start = 4;
+    UpdateLoad update = 5;
+    Stop stop = 6;
+  }
+}
+
+// ---------------- agente -> controller ----------------
+
+message Hello {
+  string agent_id = 1;
+  string name = 2;
+  int32 protocol_version = 3;
+  string sdk_version = 4;                       // versione dell'assembly LoadTest.Sdk dell'agente (es. "1.0.0.0")
+  string rid = 5;                               // win-x64, linux-arm64, ...
+  string os = 6;
+  int32 cores = 7;
+  int64 ram_mb = 8;
+  int32 max_users = 9;
+  google.protobuf.Timestamp utc_now = 10;       // orologio dell'agente al momento dell'invio
+}
+
+// Hash dei pacchetti/file che mancano nella cache dell'agente.
+message PackageRequest {
+  string run_id = 1;
+  repeated string sha256 = 2;
+}
+
+message Ready {
+  string run_id = 1;
+  bool ok = 2;
+  string error = 3;                             // valorizzato se ok = false
+}
+
+message MetricsBatch {
+  string run_id = 1;
+  int32 interval_index = 2;                     // indice dell'intervallo di campionamento (IntervalSnapshot.Index)
+  google.protobuf.Timestamp start_utc = 3;
+  google.protobuf.Timestamp end_utc = 4;        // l'ultimo intervallo può essere più corto
+  int32 active_users = 5;
+  repeated SeriesSample series = 6;
+  repeated CounterSample counters = 7;          // contatori di macchina (chat Monitoraggio): forma provvisoria
+}
+
+// Chiave di misura (CONTRATTO sez. 8). Parti assenti = campo non impostato (distinto dalla stringa vuota).
+message SeriesKey {
+  string scenario = 1;
+  string test = 2;
+  optional string page = 3;
+  optional string request = 4;
+  optional string transaction = 5;
+}
+
+enum HistogramFormat {
+  HISTOGRAM_FORMAT_NONE = 0;                    // nessun istogramma (timingDetail: none o serie senza valori)
+  HISTOGRAM_FORMAT_VARINT_DEFLATE_V1 = 1;       // stesso formato di Reports.HistogramCodec v1 (vedi G6)
+  HISTOGRAM_FORMAT_HDR_V2_COMPRESSED = 2;       // encoding V2 compresso di HdrHistogram (riservato, non implementato)
+}
+
+message SeriesSample {
+  SeriesKey key = 1;
+  int64 count = 2;
+  int64 failed = 3;
+  int64 bytes_sent = 4;
+  int64 bytes_received = 5;
+  map<string, int64> errors_by_type = 6;
+  HistogramFormat hist_format = 7;
+  bytes hist = 8;                               // HdrHistogram in microsecondi, max 1 h, 3 cifre (CONTRATTO sez. 8 + C3)
+}
+
+message CounterSample {
+  string name = 1;
+  double value = 2;
+}
+
+message ErrorBatch {
+  string run_id = 1;
+  repeated ErrorEntry errors = 2;
+}
+
+message ErrorEntry {
+  string scenario = 1;
+  string test = 2;
+  optional string page = 3;
+  optional string url = 4;
+  optional string transaction = 5;
+  int32 status_code = 6;
+  optional string error_type = 7;
+  optional string message = 8;
+  google.protobuf.Timestamp at_utc = 9;
+}
+
+message Heartbeat {
+  string run_id = 1;                            // vuoto se non c'è una run
+  double cpu_percent = 2;                       // > 80 => il report marca le misure come "agente saturo" (sez. 7)
+  int64 ram_used_mb = 3;
+  int32 active_users = 4;
+  google.protobuf.Timestamp utc_now = 5;
+  int64 clock_offset_ms = 6;                    // offset dell'orologio stimato dall'agente (può restare 0)
+}
+
+enum RunStatus {
+  RUN_STATUS_UNSPECIFIED = 0;
+  RUN_STATUS_COMPLETED = 1;
+  RUN_STATUS_ABORTED = 2;                       // come LoadTestStatus.Aborted (es. stopOnErrors)
+  RUN_STATUS_CANCELLED = 3;                     // come LoadTestStatus.Cancelled (Stop ricevuto)
+  RUN_STATUS_FAILED = 4;                        // preparazione o esecuzione non riuscita sull'agente (PROPOSTA)
+}
+
+message Finished {
+  string run_id = 1;
+  RunStatus status = 2;
+  string abort_reason = 3;
+  int64 tests_completed = 4;
+  int64 tests_failed = 5;
+  int64 request_errors = 6;
+  repeated string warnings = 7;
+}
+
+// ---------------- controller -> agente ----------------
+
+message Welcome {
+  bool accepted = 1;
+  string reject_reason = 2;                     // valorizzato se accepted = false
+  string controller_name = 3;
+  int32 protocol_version = 4;
+  string sdk_version = 5;
+  int64 clock_offset_ms = 6;                    // stima: ora_controller - ora_agente (positivo = agente in ritardo); non compensa la latenza
+  google.protobuf.Timestamp utc_now = 7;
+}
+
+enum EntryKind {
+  ENTRY_KIND_UNSPECIFIED = 0;
+  ENTRY_KIND_PLUGIN = 1;                        // pacchetto plugin (cartella con plugin.yaml)
+  ENTRY_KIND_LOAD_TEST = 2;                     // *.loadtest.yaml
+  ENTRY_KIND_WEB_TEST = 3;                      // *.webtest.yaml
+  ENTRY_KIND_DATA = 4;                          // file dati (csv, xml, ...), eventualmente la partizione dell'agente
+  ENTRY_KIND_DEPLOYMENT = 5;                    // altri deployment items (rig.deployment)
+}
+
+enum ContentEncoding {
+  CONTENT_ENCODING_UNSPECIFIED = 0;
+  CONTENT_ENCODING_PACKAGE_ZIP = 1;             // cartella del pacchetto impacchettata in zip; sha256 = hash del pacchetto (P7 chat Plugin)
+  CONTENT_ENCODING_FILE_GZIP = 2;               // file singolo compresso gzip; sha256 = SHA-256 del file NON compresso
+}
+
+message ManifestEntry {
+  EntryKind kind = 1;
+  string name = 2;
+  string version = 3;                           // per i plugin; vuoto altrimenti
+  string sha256 = 4;                            // chiave della cache locale dell'agente
+  int64 size = 5;                               // byte del contenuto non compresso
+  string path = 6;                              // percorso relativo nella cartella di lavoro della run
+  ContentEncoding encoding = 7;
+  bool partitioned = 8;                         // true: il contenuto è già la fetta di questo agente (hash per agente)
+}
+
+message PrepareRun {
+  string run_id = 1;
+  string run_name = 2;
+  string controller_name = 3;                   // per $ControllerName
+  repeated ManifestEntry manifest = 4;
+  string load_test_path = 5;                    // `path` della voce LOAD_TEST da eseguire
+  int32 partition_index = 6;                    // per IDataSource.OpenAsync(PartitionInfo)
+  int32 partition_count = 7;
+}
+
+// Il flusso di byte di una voce del manifest, a pezzi. `sequence` parte da 0.
+message PackageChunk {
+  string run_id = 1;
+  string sha256 = 2;
+  int64 sequence = 3;
+  bytes data = 4;
+  bool last = 5;
+}
+
+message StartRun {
+  string run_id = 1;
+  google.protobuf.Timestamp start_at_utc = 2;   // sull'orologio del CONTROLLER: l'agente applica clock_offset_ms di Welcome
+  double user_share = 3;                        // quota di carico dell'agente, 0..1 (dal peso nel rig)
+  int32 max_users = 4;                          // tetto di utenti dell'agente (0 = nessun tetto)
+  int32 seed = 5;
+  int32 user_id_base = 6;                       // primo $UserId dell'agente, per avere id univoci fra agenti
+}
+
+// Utenti target FINALI dell'agente (il controller ha già applicato user_share), per scenario.
+message UpdateLoad {
+  string run_id = 1;
+  repeated ScenarioTarget targets = 2;
+}
+
+message ScenarioTarget {
+  string scenario = 1;
+  int32 users = 2;
+}
+
+enum StopMode {
+  STOP_MODE_GRACEFUL = 0;                       // nessun nuovo test, i test in corso finiscono (come il cooldown)
+  STOP_MODE_ABORT = 1;                          // interrompe subito
+}
+
+message Stop {
+  string run_id = 1;
+  StopMode mode = 2;
+  string reason = 3;
+}

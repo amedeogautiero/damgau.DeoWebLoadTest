@@ -9,6 +9,7 @@
     <ProjectReference Include="..\..\src\LoadTest.Engine\LoadTest.Engine.csproj" />
     <ProjectReference Include="..\..\src\LoadTest.Plugins.Compilation\LoadTest.Plugins.Compilation.csproj" />
     <ProjectReference Include="..\..\src\LoadTest.Plugins\LoadTest.Plugins.csproj" />
+    <ProjectReference Include="..\..\src\LoadTest.Protocol\LoadTest.Protocol.csproj" />
     <ProjectReference Include="..\..\src\LoadTest.Reports\LoadTest.Reports.csproj" />
   </ItemGroup>
   <ItemGroup>
