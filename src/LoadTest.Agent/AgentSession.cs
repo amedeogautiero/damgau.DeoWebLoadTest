@@ -226,6 +226,8 @@ public sealed class AgentSession
 
         var prepared = _prepared;
         _prepared = null;
+        if (s.Iterations > 0 && prepared.Definition.RunSettings.Iterations is not null)
+            prepared.Definition.RunSettings.Iterations = s.Iterations;   // il controller divide il totale fra gli agenti (G15)
         var run = new ActiveRun(prepared, prepared.CreateCoordinator(s.UserShare, s.MaxUsers), new CancellationTokenSource());
         _run = run;
         _hbRunId = run.RunId;

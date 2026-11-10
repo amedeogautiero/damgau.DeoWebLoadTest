@@ -43,6 +43,7 @@ public static class RunExecutor
     public static PreparedRun Prepare(RunWorkspace ws)
     {
         var def = LoadTestLoader.LoadFile(ws.LoadTestPath);
+        def.RunSettings.StopOnErrors = null;   // lo valuta il controller sul totale degli agenti (G15)
         var plugins = new AgentPlugins(ws.PluginDirs);
         try
         {

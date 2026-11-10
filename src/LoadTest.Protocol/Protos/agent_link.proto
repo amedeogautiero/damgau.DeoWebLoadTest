@@ -219,6 +219,7 @@ message StartRun {
   int32 max_users = 4;                          // tetto di utenti dell'agente (0 = nessun tetto)
   int32 seed = 5;
   int32 user_id_base = 6;                       // primo $UserId dell'agente, per avere id univoci fra agenti
+  int32 iterations = 7;                         // quota delle `iterations` del load test per questo agente (0 = valore del file)
 }
 
 // Utenti target FINALI dell'agente (il controller ha già applicato user_share), per scenario.

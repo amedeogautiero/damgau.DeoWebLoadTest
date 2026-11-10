@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <RootNamespace>LoadTest.Controller</RootNamespace>
+    <AssemblyName>LoadTest.Controller</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- versione scelta a memoria (rete non disponibile quando scritto): da verificare al primo restore -->
+    <PackageReference Include="Grpc.AspNetCore" Version="2.71.0" />
+    <ProjectReference Include="..\LoadTest.Engine\LoadTest.Engine.csproj" />
+    <ProjectReference Include="..\LoadTest.Metrics\LoadTest.Metrics.csproj" />
+    <ProjectReference Include="..\LoadTest.Plugins\LoadTest.Plugins.csproj" />
+    <ProjectReference Include="..\LoadTest.Protocol\LoadTest.Protocol.csproj" />
+    <ProjectReference Include="..\LoadTest.Reports\LoadTest.Reports.csproj" />
+  </ItemGroup>
+</Project>
