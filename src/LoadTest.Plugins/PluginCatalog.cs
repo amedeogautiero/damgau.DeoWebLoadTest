@@ -39,10 +39,16 @@ public sealed class PluginCatalog
     }
 
     /// <summary>Lato agente: i pacchetti del manifest di PrepareRun, già in cache (già compilati).</summary>
-    public static PluginCatalog FromCache(PluginCache cache, IEnumerable<string> hashes)
+    /// <param name="trust">Se presente, ogni pacchetto deve rispettare la politica di firma (PROPOSTA P10 bis).</param>
+    public static PluginCatalog FromCache(PluginCache cache, IEnumerable<string> hashes, PluginTrust? trust = null)
     {
         var c = new PluginCatalog();
-        foreach (var h in hashes) c.Add(cache.Open(h));
+        foreach (var h in hashes)
+        {
+            var pkg = cache.Open(h);
+            trust?.Check(pkg);
+            c.Add(pkg);
+        }
         return c;
     }
 

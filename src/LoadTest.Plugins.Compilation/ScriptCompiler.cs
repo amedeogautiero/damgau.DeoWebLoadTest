@@ -70,7 +70,8 @@ public static class ScriptPackageCompiler
     /// Compila entry e `files` .csx insieme; gli altri `files` sono copiati. Il plugin.yaml del pacchetto compilato ha
     /// `entry: &lt;nome&gt;.dll` e non elenca più i .csx. Restituisce il pacchetto in cache: il suo Sha256 è quello da mettere nel manifest di PrepareRun.
     /// </summary>
-    public static PluginPackage Compile(PluginPackage source, PluginCache cache, IReadOnlyList<MetadataReference>? references = null)
+    public static PluginPackage Compile(PluginPackage source, PluginCache cache, IReadOnlyList<MetadataReference>? references = null,
+        string? signingPrivateKey = null)
     {
         var m = source.Manifest;
         if (!m.IsScript) throw new ArgumentException("il pacchetto non ha un entry .csx", nameof(source));
@@ -98,7 +99,9 @@ public static class ScriptPackageCompiler
                 File.Copy(Path.Combine(source.Directory, f.Replace('/', Path.DirectorySeparatorChar)), dest);
             }
             File.WriteAllText(Path.Combine(tmp, "plugin.yaml"), ManifestYaml(m, asmName + ".dll", others));
-            return cache.Add(PluginPackage.Open(tmp));
+            var added = cache.Add(PluginPackage.Open(tmp));
+            if (signingPrivateKey is not null) PluginSigning.SignPackage(added, signingPrivateKey);   // P10 bis: firma del pacchetto compilato
+            return added;
         }
         finally { Directory.Delete(tmp, true); }
     }
@@ -107,7 +110,8 @@ public static class ScriptPackageCompiler
     /// `code: plugins/Custom.csx` (sez. 4) non ha manifest: il file singolo diventa un pacchetto implicito
     /// `kinds: [codedTest]`, versione 1.0.0, sdk = major.minor dell'host (PROPOSTA P2).
     /// </summary>
-    public static PluginPackage CompileSingleFile(string csxPath, PluginCache cache, IReadOnlyList<MetadataReference>? references = null)
+    public static PluginPackage CompileSingleFile(string csxPath, PluginCache cache, IReadOnlyList<MetadataReference>? references = null,
+        string? signingPrivateKey = null)
     {
         var name = Path.GetFileNameWithoutExtension(csxPath);
         var host = PluginLoader.HostSdkVersion;
@@ -123,7 +127,7 @@ public static class ScriptPackageCompiler
                 Kinds = [PluginKind.CodedTest], Entry = file, Files = []
             };
             File.WriteAllText(Path.Combine(tmp, "plugin.yaml"), ManifestYaml(implicitManifest, file, []));
-            return Compile(PluginPackage.Open(tmp), cache, references);
+            return Compile(PluginPackage.Open(tmp), cache, references, signingPrivateKey);
         }
         finally { Directory.Delete(tmp, true); }
     }

@@ -1,0 +1,6 @@
+name: HeaderPlugin
+version: 1.0.0
+sdk: ">=1.0 <2.0"
+kinds: [ request ]
+entry: HeaderPlugin.csx
+files: [ ]
