@@ -1,5 +1,6 @@
 using System.Globalization;
 using LoadTest.Agent;
+using LoadTest.Contracts;
 using LoadTest.Controller.Api;
 using LoadTest.Engine.LoadTesting;
 using LoadTest.Engine.Runtime;
@@ -27,7 +28,8 @@ public static class LocalRunner
     }
 
     public static async Task<(RunSummaryDto Summary, Func<string> Csv)> RunAsync(
-        string loadTestFile, string dbPath, string? runName, int? seed, bool quiet, CliContext ctx)
+        string loadTestFile, string dbPath, string? runName, int? seed, bool quiet, CliContext ctx,
+        Action<RunProgressSnapshot>? onProgress = null)
     {
         var path = Path.GetFullPath(loadTestFile);
         if (!File.Exists(path)) throw new CliException(ExitCodes.Usage, $"file non trovato: {path}");
@@ -69,6 +71,14 @@ public static class LocalRunner
 
             using var repo = new SqliteResultsRepository(fullDb);
             var started = DateTimeOffset.UtcNow;
+            var progress = new RunProgressAggregator(runId);
+            void PublishProgress(RunProgressStatus status, DateTimeOffset? capturedUtc = null)
+            {
+                if (onProgress is null) return;
+                try { onProgress(progress.CreateSnapshot(status, started, capturedUtc)); }
+                catch (Exception ex) { ctx.Err.WriteLine("avviso: consumer del progresso non disponibile: " + ex.Message); }
+            }
+            PublishProgress(RunProgressStatus.Preparing, started);
             repo.BeginRun(new RunRecord(runId, name, started, File.ReadAllText(path)));
 
             var sampler = new SystemSampler();
@@ -93,6 +103,8 @@ public static class LocalRunner
                 Seed = seed ?? 12345, RunId = runId, AgentId = "local", AgentName = "local", ControllerName = "local",
                 OnInterval = snap =>
                 {
+                    progress.AddInterval(snap);
+                    PublishProgress(RunProgressStatus.Running, snap.EndUtc);
                     repo.WriteInterval(runId, "local", snap);
                     long req = 0, failed = 0;
                     foreach (var (key, s) in snap.Series)
@@ -117,10 +129,19 @@ public static class LocalRunner
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
+                PublishProgress(RunProgressStatus.Failed, DateTimeOffset.UtcNow);
                 var status = "Failed";
                 repo.CompleteRun(runId, new RunCompletion(DateTimeOffset.UtcNow, status, ex.Message, 0, 0, 0, []));
                 throw new CliException(ExitCodes.Usage, "impossibile eseguire il load test: " + ex.Message);
             }
+
+            var progressStatus = result.Status switch
+            {
+                LoadTestStatus.Completed => RunProgressStatus.Completed,
+                LoadTestStatus.Cancelled => RunProgressStatus.Cancelled,
+                _ => RunProgressStatus.Failed
+            };
+            PublishProgress(progressStatus, result.EndedUtc);
 
             repo.WriteErrorDetails(runId, result.ErrorDetails.Select(m => new ErrorDetail(
                 m.Scenario, m.Test, m.Page, m.Url, m.Transaction, m.StatusCode, m.ErrorType, m.ErrorMessage)));
