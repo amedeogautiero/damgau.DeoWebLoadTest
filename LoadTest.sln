@@ -22,6 +22,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LoadTest.Agent", "src\LoadT
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LoadTest.Controller", "src\LoadTest.Controller\LoadTest.Controller.csproj", "{B13F2BFB-DF6F-1EF8-D928-94001172ECC8}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LoadTest.Cli", "src\LoadTest.Cli\LoadTest.Cli.csproj", "{836E204E-467F-F94A-83A9-F76A8DB0388C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -68,6 +70,10 @@ Global
 		{B13F2BFB-DF6F-1EF8-D928-94001172ECC8}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B13F2BFB-DF6F-1EF8-D928-94001172ECC8}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B13F2BFB-DF6F-1EF8-D928-94001172ECC8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{836E204E-467F-F94A-83A9-F76A8DB0388C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{836E204E-467F-F94A-83A9-F76A8DB0388C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{836E204E-467F-F94A-83A9-F76A8DB0388C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{836E204E-467F-F94A-83A9-F76A8DB0388C}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

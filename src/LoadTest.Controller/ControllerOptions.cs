@@ -33,5 +33,9 @@ public sealed class ControllerOptions
     /// <summary>false: se un agente del rig non è connesso la run non parte. true: parte con gli agenti disponibili (avviso).</summary>
     public bool AllowPartialRig { get; set; }
 
+    /// <summary>Progetti caricati dalla CLI (POST /api/projects): dimensione massima dello zip e giorni di permanenza.</summary>
+    public long MaxProjectUploadBytes { get; set; } = 512L << 20;
+    public int ProjectRetentionHours { get; set; } = 24;
+
     public string ResultsPath => string.IsNullOrWhiteSpace(ResultsDatabase) ? Path.Combine(WorkDirectory, "results.db") : ResultsDatabase;
 }
