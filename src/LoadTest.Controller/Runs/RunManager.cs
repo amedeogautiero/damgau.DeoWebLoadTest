@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using LoadTest.Protocol;
+using LoadTest.Contracts;
 
 namespace LoadTest.Controller.Runs;
 
@@ -7,7 +8,7 @@ public sealed record AgentSnapshot(string Name, string State);
 
 public sealed record RunSnapshot(
     string RunId, string Name, string State, DateTimeOffset? StartedUtc, string? Status, string? Reason,
-    int ActiveUsers, long Requests, long Errors, long CompletedTests, long FailedTests, IReadOnlyList<string> Warnings, IReadOnlyList<AgentSnapshot> Agents);
+    int ActiveUsers, long Requests, long Errors, long CompletedTests, long FailedTests, IReadOnlyList<RunProgressSeriesSnapshot> Series, IReadOnlyList<string> Warnings, IReadOnlyList<AgentSnapshot> Agents);
 
 /// <summary>Run in corso e concluse (in memoria) del controller: avvio, stop, stato. I risultati stanno nel repository SQLite.</summary>
 public sealed class RunManager(RunOrchestrator orchestrator, ILogger<RunManager> log)
@@ -51,7 +52,7 @@ public sealed class RunManager(RunOrchestrator orchestrator, ILogger<RunManager>
         var o = p.Outcome;
         return new RunSnapshot(
             m.Plan.RunId, m.Plan.Name, p.State, p.StartedUtc, o?.Status, o?.Reason,
-            p.ActiveUsers, p.Requests, p.Errors, p.CompletedTests, p.FailedTests, o?.Warnings ?? [],
+            p.ActiveUsers, p.Requests, p.Errors, p.CompletedTests, p.FailedTests, p.Series, o?.Warnings ?? [],
             p.AgentStates.Select(kv => new AgentSnapshot(kv.Key, kv.Value)).OrderBy(a => a.Name, StringComparer.Ordinal).ToList());
     }
 }
