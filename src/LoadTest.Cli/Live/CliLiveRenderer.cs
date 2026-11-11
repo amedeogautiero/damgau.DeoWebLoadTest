@@ -78,17 +78,20 @@ public sealed class CliLiveRenderer : IDisposable
         }
         else
         {
-            lines.Add($"{"Scenario",-18} {"Test",-18} {"Richiesta",-22} {"Count",8} {"P95",9} {"Errori",8}");
+            lines.Add($"{"Scenario",-14} {"Test",-14} {"Richiesta",-20} {"Count",7} {"P50",8} {"P95",8} {"P99",8} {"Max",8} {"Errori",7}");
             foreach (var item in requests)
             {
                 var requestName = item.RequestName ?? item.PageName ?? item.TransactionName ?? "-";
-                lines.Add($"{Clip(item.ScenarioName, 18),-18} {Clip(item.TestName, 18),-18} {Clip(requestName, 22),-22} {item.Count,8:N0} {item.P95Milliseconds,8:N1}ms {item.Failed,8:N0}");
+                lines.Add($"{Clip(item.ScenarioName, 14),-14} {Clip(item.TestName, 14),-14} {Clip(requestName, 20),-20} {item.Count,7:N0} {FormatMilliseconds(item.P50Milliseconds),8} {FormatMilliseconds(item.P95Milliseconds),8} {FormatMilliseconds(item.P99Milliseconds),8} {FormatMilliseconds(item.MaxMilliseconds),8} {item.Failed,7:N0}");
             }
         }
 
         lines.Add($"Snapshot #{snapshot.Sequence} · aggiornato {snapshot.CapturedUtc.ToLocalTime():HH:mm:ss}");
         return lines;
     }
+
+    private static string FormatMilliseconds(double value) =>
+        value > 0 ? value.ToString("N1", CultureInfo.InvariantCulture) : "-";
 
     private static string Clip(string value, int length) =>
         value.Length <= length ? value : value[..(length - 1)] + "…";
