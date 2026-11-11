@@ -314,6 +314,7 @@ public sealed class RunOrchestrator(
             run.Progress.Errors = Interlocked.Read(ref rt.Errors);
             run.Progress.CompletedTests = Interlocked.Read(ref rt.CompletedTests);
             run.Progress.FailedTests = Interlocked.Read(ref rt.FailedTests);
+            run.Progress.AdvanceSequence();
 
             if (ps.All(p => p.FinishedTcs.Task.IsCompleted)) break;
             if (forceEnd is { } fe && now > fe)
@@ -424,6 +425,7 @@ public sealed class RunOrchestrator(
         var progressSnapshot = rt.ProgressAggregator.CreateSnapshot(
             RunProgressStatus.Running, rt.Run.Progress.StartedUtc, snap.EndUtc);
         rt.Run.Progress.Series = progressSnapshot.Series;
+        rt.Run.Progress.AdvanceSequence();
         Interlocked.Exchange(ref rt.CompletedTests, progressSnapshot.CompletedTests);
         Interlocked.Exchange(ref rt.FailedTests, progressSnapshot.FailedTests);
         var total = Interlocked.Add(ref rt.Errors, failedRequests);
