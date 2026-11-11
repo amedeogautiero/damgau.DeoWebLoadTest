@@ -1,6 +1,9 @@
 (() => {
   const $ = id => document.getElementById(id);
   const terminal = new Set(["Completed", "Failed", "Cancelled"]);
+  const progressStatuses = ["Queued", "Preparing", "Running", "Stopping", "Completed", "Failed", "Cancelled"];
+  const seriesKinds = ["Test", "Transaction", "Request"];
+  const enumName = (value, names) => typeof value === "number" ? (names[value] ?? String(value)) : String(value ?? "");
   const state = { runs: [], selectedId: null, filter: "all", source: null, progress: null, refreshTimer: null };
   const number = value => new Intl.NumberFormat("it-IT", { maximumFractionDigits: 0 }).format(value ?? 0);
   const decimal = (value, digits = 2) => new Intl.NumberFormat("it-IT", { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(value ?? 0);
@@ -55,6 +58,7 @@
   }
 
   function renderProgress(progress) {
+    progress.status = enumName(progress.status, progressStatuses);
     state.progress = progress;
     $("runIdShort").textContent = shortId(progress.runId);
     const run = state.runs.find(r => r.runId === progress.runId);
@@ -69,7 +73,7 @@
     $("testsCompleted").textContent = number(progress.completedTests);
     $("testsFailed").textContent = number(progress.failedTests);
     $("throughput").innerHTML = decimal(progress.requestsPerSecond) + ' <em>req/s</em>';
-    const rows = (progress.series || []).filter(x => x.kind === "Request").sort((a,b) => (b.count || 0) - (a.count || 0));
+    const rows = (progress.series || []).filter(x => enumName(x.kind, seriesKinds) === "Request").sort((a,b) => (b.count || 0) - (a.count || 0));
     $("seriesCount").textContent = rows.length + (rows.length === 1 ? " richiesta" : " richieste");
     $("requestRows").innerHTML = rows.length ? rows.map(item => {
       const requestName = item.requestName || item.pageName || item.transactionName || "—";
