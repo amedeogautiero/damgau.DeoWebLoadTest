@@ -151,7 +151,7 @@ public static class RemoteRunner
             StartedUtc = summary.StartedUtc,
             CapturedUtc = capturedUtc,
             ElapsedSeconds = elapsed,
-            ActiveUsers = 0,
+            ActiveUsers = run.ActiveUsers,
             CompletedTests = summary.TestsCompleted,
             FailedTests = summary.TestsFailed,
             CompletedRequests = run.Requests,
