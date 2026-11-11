@@ -5,6 +5,6 @@
     <AssemblyName>LoadTest.VSCode.Host</AssemblyName>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\LoadTest.Engine\LoadTest.Engine.csproj" />
+    <ProjectReference Include="..\LoadTest.Execution\LoadTest.Execution.csproj" />
   </ItemGroup>
 </Project>

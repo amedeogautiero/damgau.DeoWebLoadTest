@@ -1,6 +1,7 @@
 using LoadTest.Engine.LoadTesting;
 using LoadTest.Engine.Runtime;
 using LoadTest.Metrics;
+using LoadTest.Plugins;
 using LoadTest.Protocol;
 using LoadTest.Sdk;
 
