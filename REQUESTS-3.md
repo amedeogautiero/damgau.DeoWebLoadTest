@@ -216,6 +216,30 @@ Prima di modificare il codice:
 3. Individua come viene gestito il ciclo di vita delle iterazioni.
 4. Individua come `Call` condivide attualmente l'EngineServices e l'executor.
 
+Una precisazione implementativa importante:
+
+In `LoadTestRunner.RunUserAsync()` non modificare il significato attuale della variabile `isNew`, che governa la creazione di un nuovo Virtual User attraverso `newUsersPercent`.
+
+Separa esplicitamente le due decisioni:
+
+- `isNewUser`: determina se creare un nuovo Virtual User e il relativo contesto.
+- `isNewSession`: determina se creare un nuovo HttpClientExecutor.
+
+La logica concettuale deve essere:
+
+```csharp
+var isNewUser = uctx is null ||
+    rng.NextDouble() * 100 < sc.Def.NewUsersPercent;
+
+var isNewSession = isNewUser ||
+    sc.Def.Session.Scope == SessionScope.Iteration;
+```
+
+`isNewSession` deve governare la creazione e il rilascio dell'HttpClientExecutor, mentre `isNewUser` deve continuare a governare la creazione del contesto utente.
+
+Attenzione a mantenere invariata la semantica attuale del contesto utente quando viene creata una nuova HTTP Session ma il Virtual User rimane lo stesso.
+```
+
 Poi implementa la soluzione rispettando l'architettura esistente.
 
 Non limitarti a modificare i test per farli passare: il comportamento deve essere effettivamente verificato.
