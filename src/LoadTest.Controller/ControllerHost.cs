@@ -40,8 +40,9 @@ public static class ControllerHost
         builder.Services.AddSingleton<RunManager>();
 
         var app = builder.Build();
-        app.UseDefaultFiles();
-        app.UseStaticFiles();
+
+        // La dashboard è incorporata nell'assembly: non dipende da ContentRoot, WebRoot o directory di avvio.
+        app.UseMiddleware<EmbeddedDashboardMiddleware>();
         app.MapGrpcService<AgentLinkService>().RequireHost("*:" + new Uri(opt.ListenUrl).Port);
         app.MapControllerApi("*:" + new Uri(opt.ApiUrl).Port);
         return app;
