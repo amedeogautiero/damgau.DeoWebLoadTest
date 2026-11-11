@@ -111,7 +111,8 @@ public static class RemoteRunner
             FailedTests = run.FailedTests,
             CompletedRequests = run.Requests,
             FailedRequests = run.Errors,
-            RequestsPerSecond = requestsPerSecond
+            RequestsPerSecond = requestsPerSecond,
+            Series = run.Series
         };
 
     private static RunProgressSnapshot CreateFinalProgress(
