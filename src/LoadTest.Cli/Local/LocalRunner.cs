@@ -112,7 +112,7 @@ public static class LocalRunner
                     lock (lockObj)
                     {
                         runRequests += req; runErrors += failed;
-                        if (!quiet)
+                        if (!quiet && onProgress is null)
                             ctx.Out.WriteLine(string.Create(CultureInfo.InvariantCulture,
                                 $"[{(snap.EndUtc - started).TotalSeconds,5:0}s] utenti {snap.ActiveUsers} · richieste {runRequests} · errori {runErrors}"));
                     }
