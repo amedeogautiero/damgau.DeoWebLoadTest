@@ -43,6 +43,50 @@ public sealed class RunManager(RunOrchestrator orchestrator, ILogger<RunManager>
 
     public RunSnapshot? Get(string runId) => _runs.TryGetValue(runId, out var m) ? Snapshot(m) : null;
 
+    /// <summary>Restituisce il contratto di progressione neutrale rispetto al client e al trasporto.</summary>
+    public RunProgressSnapshot? GetProgress(string runId)
+    {
+        if (!_runs.TryGetValue(runId, out var m)) return null;
+
+        var p = m.Plan.Progress;
+        var outcome = p.Outcome;
+        var capturedUtc = DateTimeOffset.UtcNow;
+        var status = outcome is not null
+            ? outcome.Status.Equals("Completed", StringComparison.OrdinalIgnoreCase)
+                ? RunProgressStatus.Completed
+                : outcome.Status.Equals("Cancelled", StringComparison.OrdinalIgnoreCase)
+                    ? RunProgressStatus.Cancelled
+                    : RunProgressStatus.Failed
+            : p.State switch
+            {
+                "Planned" => RunProgressStatus.Queued,
+                "Setup" or "Preparing" => RunProgressStatus.Preparing,
+                "Running" => RunProgressStatus.Running,
+                "Finishing" => RunProgressStatus.Stopping,
+                _ => RunProgressStatus.Queued
+            };
+
+        var series = p.Series;
+        return new RunProgressSnapshot
+        {
+            RunId = m.Plan.RunId,
+            Sequence = p.Sequence,
+            Status = status,
+            StartedUtc = p.StartedUtc,
+            CapturedUtc = capturedUtc,
+            ElapsedSeconds = p.StartedUtc is { } started
+                ? Math.Max(0, (capturedUtc - started).TotalSeconds)
+                : 0,
+            ActiveUsers = p.ActiveUsers,
+            CompletedTests = p.CompletedTests,
+            FailedTests = p.FailedTests,
+            CompletedRequests = p.Requests,
+            FailedRequests = p.Errors,
+            RequestsPerSecond = series.Where(s => s.Kind == RunProgressSeriesKind.Request).Sum(s => s.OperationsPerSecond),
+            Series = series
+        };
+    }
+
     public IReadOnlyList<RunSnapshot> List() =>
         _runs.Values.Select(Snapshot).OrderByDescending(s => s.StartedUtc ?? DateTimeOffset.MinValue).ToList();
 
