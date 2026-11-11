@@ -23,20 +23,21 @@ public static class RunCommand
         var gate = CommonOptions.ParseGate(p);
         var output = CommonOptions.ParseOutput(p);
         var seed = p.GetLong("seed") is { } s ? checked((int)s) : (int?)null;
+        var quiet = output.Quiet || output.JsonPath == "-";
+        var interactive = !quiet && !Console.IsOutputRedirected;
 
         Controller.Api.RunSummaryDto summary;
         Func<string> csv;
-        if (CommonOptions.ControllerUrl(p, allowEnv: false) is { } url)
-            (summary, csv) = await RemoteRunner.RunAsync(p.Positional[0], url, p, seed, output.CsvPath is not null, ctx);
-        else
+        using (var liveRenderer = new CliLiveRenderer(ctx.Out, interactive))
         {
-            var quiet = output.Quiet || output.JsonPath == "-";
-            var interactive = !quiet && !Console.IsOutputRedirected;
-            using var liveRenderer = new CliLiveRenderer(ctx.Out, interactive);
             Action<RunProgressSnapshot>? onProgress = interactive ? liveRenderer.Render : null;
-            (summary, csv) = await LocalRunner.RunAsync(
-                p.Positional[0], p.Get("db") ?? "loadtest-results.db", p.Get("name"),
-                seed, quiet, ctx, onProgress);
+            if (CommonOptions.ControllerUrl(p, allowEnv: false) is { } url)
+                (summary, csv) = await RemoteRunner.RunAsync(
+                    p.Positional[0], url, p, seed, output.CsvPath is not null, ctx, onProgress);
+            else
+                (summary, csv) = await LocalRunner.RunAsync(
+                    p.Positional[0], p.Get("db") ?? "loadtest-results.db", p.Get("name"),
+                    seed, quiet, ctx, onProgress);
         }
 
         return Ci.ResultOutput.Emit(summary, gate, output, csv, ctx.Out, ctx.Err, ctx.Stop.IsCancellationRequested);
