@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using Google.Protobuf;
 using Google.Protobuf.WellKnownTypes;
+using LoadTest.Contracts;
 using LoadTest.Controller.Agents;
 using LoadTest.Controller.Packaging;
 using LoadTest.Controller.Rig;
@@ -40,6 +41,7 @@ public sealed class RunOrchestrator(
         public int MaxErrorDetails { get; } = maxErrorDetails;
         public int? StopOnErrors { get; } = stopOnErrors;
         public long Requests, Errors, CompletedTests, FailedTests, ErrorDetails;
+        public RunProgressAggregator ProgressAggregator { get; } = new(run.RunId);
         public volatile bool StopOnErrorsHit;
         public CancellationTokenSource Cts { get; } = new();
         public CancellationToken Cancel => Cts.Token;
@@ -417,6 +419,11 @@ public sealed class RunOrchestrator(
         Interlocked.Add(ref rt.Requests, requests);
         Interlocked.Add(ref rt.CompletedTests, completedTests);
         Interlocked.Add(ref rt.FailedTests, failedTests);
+        var progressSnapshot = rt.ProgressAggregator.CreateSnapshot(
+            RunProgressStatus.Running, rt.Run.Progress.StartedUtc, snap.EndUtc);
+        rt.Run.Progress.Series = progressSnapshot.Series;
+        Interlocked.Exchange(ref rt.CompletedTests, progressSnapshot.CompletedTests);
+        Interlocked.Exchange(ref rt.FailedTests, progressSnapshot.FailedTests);
         var total = Interlocked.Add(ref rt.Errors, failedRequests);
         if (rt.StopOnErrors is { } n && total >= n) rt.StopOnErrorsHit = true;
     }
