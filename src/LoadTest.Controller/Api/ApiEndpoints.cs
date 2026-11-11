@@ -89,7 +89,7 @@ public static class ApiEndpoints
             RunProgressStatus? lastStatus = null;
             var lastHeartbeatUtc = DateTimeOffset.UtcNow;
 
-            await context.Response.WriteAsync("retry: 3000\\n\\n", cancellationToken);
+            await context.Response.WriteAsync("retry: 3000\n\n", cancellationToken);
 
             using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(500));
             do
@@ -101,7 +101,7 @@ public static class ApiEndpoints
                 {
                     var json = JsonSerializer.Serialize(progress, jsonOptions);
                     await context.Response.WriteAsync(
-                        $"id: {progress.Sequence}\\nevent: progress\\ndata: {json}\\n\\n",
+                        $"id: {progress.Sequence}\nevent: progress\ndata: {json}\n\n",
                         cancellationToken);
                     await context.Response.Body.FlushAsync(cancellationToken);
 
@@ -113,7 +113,7 @@ public static class ApiEndpoints
                 }
                 else if (DateTimeOffset.UtcNow - lastHeartbeatUtc >= TimeSpan.FromSeconds(15))
                 {
-                    await context.Response.WriteAsync(": keep-alive\\n\\n", cancellationToken);
+                    await context.Response.WriteAsync(": keep-alive\n\n", cancellationToken);
                     await context.Response.Body.FlushAsync(cancellationToken);
                     lastHeartbeatUtc = DateTimeOffset.UtcNow;
                 }
