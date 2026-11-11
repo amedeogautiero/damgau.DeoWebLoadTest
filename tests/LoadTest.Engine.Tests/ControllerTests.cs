@@ -411,10 +411,13 @@ public class ControllerTests
         var control = new RunControl();
         var task = orch.ExecuteAsync(planned, control);
 
-        await WaitFor(() => planned.Progress.CompletedTests > 0);
+        await WaitFor(() => planned.Progress.CompletedTests > 0
+            && planned.Progress.Series.Any(s => s.Kind == LoadTest.Contracts.RunProgressSeriesKind.Request));
         Assert.Equal("Running", planned.Progress.State);
         Assert.True(planned.Progress.CompletedTests > 0);
         Assert.Equal(0, planned.Progress.FailedTests);
+        Assert.Contains(planned.Progress.Series, s => s.Kind == LoadTest.Contracts.RunProgressSeriesKind.Test && s.Count > 0);
+        Assert.Contains(planned.Progress.Series, s => s.Kind == LoadTest.Contracts.RunProgressSeriesKind.Request && s.Count > 0);
 
         control.Stop(StopMode.Abort, "test progress");
         var outcome = await task.WaitAsync(TimeSpan.FromSeconds(60));
