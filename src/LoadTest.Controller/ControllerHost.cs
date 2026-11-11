@@ -40,6 +40,8 @@ public static class ControllerHost
         builder.Services.AddSingleton<RunManager>();
 
         var app = builder.Build();
+        app.UseDefaultFiles();
+        app.UseStaticFiles();
         app.MapGrpcService<AgentLinkService>().RequireHost("*:" + new Uri(opt.ListenUrl).Port);
         app.MapControllerApi("*:" + new Uri(opt.ApiUrl).Port);
         return app;
