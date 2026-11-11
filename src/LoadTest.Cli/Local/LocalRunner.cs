@@ -2,7 +2,9 @@ using System.Globalization;
 using LoadTest.Cli.Ci;
 using LoadTest.Contracts;
 using LoadTest.Controller.Api;
+using LoadTest.Engine.LoadTesting;
 using LoadTest.Execution;
+using LoadTest.Metrics;
 using LoadTest.Plugins;
 
 namespace LoadTest.Cli.Local;
