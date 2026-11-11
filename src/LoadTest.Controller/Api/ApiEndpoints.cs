@@ -62,6 +62,10 @@ public static class ApiEndpoints
 
         api.MapGet("/runs", (RunManager runs) => runs.List());
         api.MapGet("/runs/{id}", (string id, RunManager runs) => runs.Get(id) is { } s ? Results.Ok(s) : Results.NotFound());
+
+        // Contratto condiviso di progressione: polling REST senza dipendere dal DTO interno RunSnapshot.
+        api.MapGet("/runs/{id}/progress", (string id, RunManager runs) =>
+            runs.GetProgress(id) is { } progress ? Results.Ok(progress) : Results.NotFound());
         api.MapPost("/runs/{id}/stop", (string id, string? mode, string? reason, RunManager runs) =>
         {
             var m = string.Equals(mode, "abort", StringComparison.OrdinalIgnoreCase) ? StopMode.Abort : StopMode.Graceful;
