@@ -125,6 +125,7 @@ public static class LocalRunner
             {
                 var runner = new LoadTestRunner(def, options);
                 runner.Events.Heartbeat += a => Volatile.Write(ref activeUsers, a.ActiveUsers);
+                PublishProgress(RunProgressStatus.Running, DateTimeOffset.UtcNow);
                 result = await runner.RunAsync(ctx.Stop);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
