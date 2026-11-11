@@ -13,6 +13,8 @@ public sealed class ContentCache
         Directory.CreateDirectory(_root);
     }
 
+    public string Root => _root;
+
     public bool Contains(string sha256) => File.Exists(PathFor(sha256));
 
     public string PathFor(string sha256)

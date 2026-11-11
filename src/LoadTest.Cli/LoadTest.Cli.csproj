@@ -2,8 +2,20 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <RootNamespace>LoadTest.Cli</RootNamespace>
-    <!-- il comando si chiama `loadtest` (CONTRATTO sez. 3) -->
+    <!-- il comando si chiama `loadtest` (CONTRATTO sez. 3): CLI completa, con controller e agente -->
     <AssemblyName>loadtest</AssemblyName>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+  <!-- publish per RID (dotnet publish -r <rid>): self-contained, file singolo, compresso. Niente trimming. -->
+  <PropertyGroup Condition="'$(RuntimeIdentifier)' != ''">
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <PublishTrimmed>false</PublishTrimmed>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <DebugType>none</DebugType>
   </PropertyGroup>
   <ItemGroup>
     <!-- il controller è un progetto Web: la CLI lo ospita (`loadtest controller`) -->

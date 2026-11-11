@@ -27,6 +27,11 @@ public sealed class AgentOptions
     public long MaxEntryBytes { get; set; } = 1L << 30;
     public long MaxRunBytes { get; set; } = 4L << 30;
 
+    /// <summary>Cache per hash (file e pacchetti plugin): all'inizio di ogni preparazione si eliminano le voci non usate da più di
+    /// CacheMaxAgeDays giorni e, se si supera CacheMaxBytes, le meno recenti (mai quelle del manifest in preparazione). 0 = nessun limite.</summary>
+    public long CacheMaxBytes { get; set; } = 2L << 30;
+    public int CacheMaxAgeDays { get; set; } = 14;
+
     /// <summary>Mantiene la cartella di lavoro della run dopo la fine (diagnostica).</summary>
     public bool KeepRunFolders { get; set; }
 }

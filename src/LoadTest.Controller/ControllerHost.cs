@@ -17,8 +17,12 @@ public static class ControllerHost
 {
     public static WebApplication Build(string[] args)
     {
-        var builder = WebApplication.CreateBuilder(args);
+        // radice del contenuto = cartella dell'eseguibile (un servizio Windows parte da System32)
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions { Args = args, ContentRootPath = AppContext.BaseDirectory });
         builder.Services.Configure<ControllerOptions>(builder.Configuration.GetSection("Controller"));
+        // come servizio: systemd (Type=notify) e Service Control Manager; da terminale non cambia nulla
+        builder.Services.AddWindowsService(o => o.ServiceName = "LoadTestController");
+        builder.Services.AddSystemd();
         var opt = builder.Configuration.GetSection("Controller").Get<ControllerOptions>() ?? new ControllerOptions();
 
         builder.WebHost.ConfigureKestrel(k => KestrelSetup.Configure(k, opt));

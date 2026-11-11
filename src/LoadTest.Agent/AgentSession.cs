@@ -148,6 +148,7 @@ public sealed class AgentSession
         try
         {
             var entries = RunWorkspace.ValidateManifest(p, _opt);
+            MaintainCache(entries);
             var missing = entries.Where(e => !IsCached(e)).GroupBy(e => e.Sha256).Select(g => g.First()).ToList();
             _prep = new PrepState(p, entries, new TransferReceiver(missing, _caches.Files, _caches.Plugins, _caches.TempRoot));
             _state = State.Preparing;
@@ -161,6 +162,23 @@ public sealed class AgentSession
         }
         catch (OperationCanceledException) { throw; }
         catch (Exception ex) { FailPrepare(p.RunId, ex); }
+    }
+
+    /// <summary>Segna come usate le voci già in cache per questa run ed elimina le vecchie (solo da Idle, vedi <see cref="AgentCaches.Evict"/>).</summary>
+    private void MaintainCache(IReadOnlyList<ManifestEntry> entries)
+    {
+        try
+        {
+            foreach (var e in entries.Where(IsCached)) _caches.Touch(e.Sha256, e.Kind == EntryKind.Plugin);
+            var result = _caches.Evict(entries.Select(e => e.Sha256).ToHashSet(StringComparer.Ordinal),
+                _opt.CacheMaxBytes, TimeSpan.FromDays(Math.Max(0, _opt.CacheMaxAgeDays)));
+            if (result.Removed > 0)
+                _log.LogInformation("Cache: eliminate {Count} voci ({Mb} MB)", result.Removed, result.FreedBytes / (1024 * 1024));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _log.LogWarning("Pulizia della cache non riuscita: {Message}", ex.Message);
+        }
     }
 
     private bool IsCached(ManifestEntry e) => e.Kind == EntryKind.Plugin ? _caches.Plugins.Contains(e.Sha256) : _caches.Files.Contains(e.Sha256);
