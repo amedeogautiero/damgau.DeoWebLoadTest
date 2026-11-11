@@ -10,6 +10,7 @@
     <ProjectReference Include="..\..\src\LoadTest.Cli\LoadTest.Cli.csproj" />
     <ProjectReference Include="..\..\src\LoadTest.Controller\LoadTest.Controller.csproj" />
     <ProjectReference Include="..\..\src\LoadTest.Engine\LoadTest.Engine.csproj" />
+    <ProjectReference Include="..\\..\\src\\LoadTest.Metrics\\LoadTest.Metrics.csproj" />
     <ProjectReference Include="..\..\src\LoadTest.Plugins.Compilation\LoadTest.Plugins.Compilation.csproj" />
     <ProjectReference Include="..\..\src\LoadTest.Plugins\LoadTest.Plugins.csproj" />
     <ProjectReference Include="..\..\src\LoadTest.Protocol\LoadTest.Protocol.csproj" />
