@@ -133,21 +133,38 @@ internal static class Usage
             """ + Gate,
         "validate" => "loadtest validate <file.loadtest.yaml...>\n\n  Controlla load test, rig, web test (anche `call:`), data source, file di body e plugin. Esce con 2 se qualcosa non va.",
         "report" => "loadtest report --db <file> [--run <id>]\n\n  Senza --run usa l'ultima run del database.\n\n" + Gate,
+        
         "controller" => """
             loadtest controller [opzioni]
-              --listen <url>   endpoint gRPC degli agenti (default https://0.0.0.0:5001)   --api <url>   API JSON (default http://127.0.0.1:5000)
-              --cert <pfx> --cert-password <p>   certificato del server (obbligatorio per https)
-              --agent-token <t>   token ammesso per gli agenti (ripetibile)   --allow-anonymous-agents   solo sviluppo
-              --require-client-cert   mTLS   --trusted-client-cert <thumbprint> (ripetibile)
-              --api-token <t>   --work-dir <dir>   --results-db <file>   --allow-partial-rig
+              --listen <url>   endpoint gRPC degli agenti (default https://0.0.0.0:5001)   
+              --api <url>   API JSON (default http://127.0.0.1:5000)
+              --cert <pfx> 
+              --cert-password <p>   certificato del server (obbligatorio per https)
+              --agent-token <t>   token ammesso per gli agenti (ripetibile)   
+              --allow-anonymous-agents   solo sviluppo
+              --require-client-cert   mTLS   
+              --trusted-client-cert <thumbprint> (ripetibile)
+              --api-token <t>   
+              --work-dir <dir>   
+              --results-db <file>   
+              --allow-partial-rig
               Qualsiasi chiave come --Controller:Chiave=valore.
             """,
+        
         "agent" => """
             loadtest agent [opzioni]
-              --controller <url> --token <t> --name <nome> --agent-id <id> --work-dir <dir> --max-users <n>
-              --client-cert <pfx> --client-cert-password <p> --insecure (solo sviluppo)
+              --controller <url> 
+              --token <t> 
+              --name <nome> 
+              --agent-id <id> 
+              --work-dir <dir> 
+              --max-users <n>
+              --client-cert <pfx> 
+              --client-cert-password <p> 
+              --insecure (solo sviluppo)
               Qualsiasi chiave come --Agent:Chiave=valore.
             """,
+
         "agents" => "loadtest agents --controller <url> [--token <t>]\n\n  Elenca gli agenti connessi. Variabili: LOADTEST_CONTROLLER, LOADTEST_TOKEN.",
         "status" => "loadtest status <runId> --controller <url> [--token <t>]",
         "stop" => "loadtest stop <runId> --controller <url> [--token <t>] [--abort] [--reason <testo>]",
