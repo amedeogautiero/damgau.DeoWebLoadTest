@@ -1,4 +1,5 @@
 using LoadTest.Protocol;
+using LoadTest.Contracts;
 
 namespace LoadTest.Controller.Runs;
 
@@ -39,6 +40,7 @@ public sealed class RunProgress
     public long Errors { get => Interlocked.Read(ref _errors); set => Interlocked.Exchange(ref _errors, value); }
     public long CompletedTests { get => Interlocked.Read(ref _completedTests); set => Interlocked.Exchange(ref _completedTests, value); }
     public long FailedTests { get => Interlocked.Read(ref _failedTests); set => Interlocked.Exchange(ref _failedTests, value); }
+    public IReadOnlyList<RunProgressSeriesSnapshot> Series { get; set; } = Array.Empty<RunProgressSeriesSnapshot>();
     public RunOutcome? Outcome { get; set; }
     public System.Collections.Concurrent.ConcurrentDictionary<string, string> AgentStates { get; } = new(StringComparer.Ordinal);
 }
