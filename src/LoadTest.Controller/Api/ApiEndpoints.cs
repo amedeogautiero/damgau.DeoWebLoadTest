@@ -1,3 +1,4 @@
+using System.Text.Json;
 using LoadTest.Controller.Agents;
 using LoadTest.Controller.Runs;
 using LoadTest.Protocol;
@@ -66,6 +67,59 @@ public static class ApiEndpoints
         // Contratto condiviso di progressione: polling REST senza dipendere dal DTO interno RunSnapshot.
         api.MapGet("/runs/{id}/progress", (string id, RunManager runs) =>
             runs.GetProgress(id) is { } progress ? Results.Ok(progress) : Results.NotFound());
+
+        // Stream SSE degli snapshot: il client apre una sola richiesta HTTP e riceve gli aggiornamenti.
+        api.MapGet("/runs/{id}/events", async (string id, HttpContext context, RunManager runs) =>
+        {
+            var initial = runs.GetProgress(id);
+            if (initial is null)
+            {
+                context.Response.StatusCode = StatusCodes.Status404NotFound;
+                return;
+            }
+
+            context.Response.StatusCode = StatusCodes.Status200OK;
+            context.Response.Headers.ContentType = "text/event-stream";
+            context.Response.Headers.CacheControl = "no-cache, no-store";
+            context.Response.Headers.Append("X-Accel-Buffering", "no");
+
+            var cancellationToken = context.RequestAborted;
+            var jsonOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+            long lastSequence = -1;
+            RunProgressStatus? lastStatus = null;
+            var lastHeartbeatUtc = DateTimeOffset.UtcNow;
+
+            await context.Response.WriteAsync("retry: 3000\\n\\n", cancellationToken);
+
+            using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(500));
+            do
+            {
+                var progress = runs.GetProgress(id);
+                if (progress is null) break;
+
+                if (progress.Sequence != lastSequence || progress.Status != lastStatus)
+                {
+                    var json = JsonSerializer.Serialize(progress, jsonOptions);
+                    await context.Response.WriteAsync(
+                        $"id: {progress.Sequence}\\nevent: progress\\ndata: {json}\\n\\n",
+                        cancellationToken);
+                    await context.Response.Body.FlushAsync(cancellationToken);
+
+                    lastSequence = progress.Sequence;
+                    lastStatus = progress.Status;
+
+                    if (progress.Status is RunProgressStatus.Completed or RunProgressStatus.Failed or RunProgressStatus.Cancelled)
+                        break;
+                }
+                else if (DateTimeOffset.UtcNow - lastHeartbeatUtc >= TimeSpan.FromSeconds(15))
+                {
+                    await context.Response.WriteAsync(": keep-alive\\n\\n", cancellationToken);
+                    await context.Response.Body.FlushAsync(cancellationToken);
+                    lastHeartbeatUtc = DateTimeOffset.UtcNow;
+                }
+            }
+            while (await timer.WaitForNextTickAsync(cancellationToken));
+        });
         api.MapPost("/runs/{id}/stop", (string id, string? mode, string? reason, RunManager runs) =>
         {
             var m = string.Equals(mode, "abort", StringComparison.OrdinalIgnoreCase) ? StopMode.Abort : StopMode.Graceful;
