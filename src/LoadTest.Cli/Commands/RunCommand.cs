@@ -1,6 +1,8 @@
 using LoadTest.Cli.Args;
 using LoadTest.Cli.Local;
 using LoadTest.Cli.Remote;
+using LoadTest.Cli.Live;
+using LoadTest.Contracts;
 
 namespace LoadTest.Cli.Commands;
 
@@ -27,7 +29,15 @@ public static class RunCommand
         if (CommonOptions.ControllerUrl(p, allowEnv: false) is { } url)
             (summary, csv) = await RemoteRunner.RunAsync(p.Positional[0], url, p, seed, output.CsvPath is not null, ctx);
         else
-            (summary, csv) = await LocalRunner.RunAsync(p.Positional[0], p.Get("db") ?? "loadtest-results.db", p.Get("name"), seed, output.Quiet || output.JsonPath == "-", ctx);
+        {
+            var quiet = output.Quiet || output.JsonPath == "-";
+            var interactive = !quiet && !Console.IsOutputRedirected;
+            using var liveRenderer = new CliLiveRenderer(ctx.Out, interactive);
+            Action<RunProgressSnapshot>? onProgress = interactive ? liveRenderer.Render : null;
+            (summary, csv) = await LocalRunner.RunAsync(
+                p.Positional[0], p.Get("db") ?? "loadtest-results.db", p.Get("name"),
+                seed, quiet, ctx, onProgress);
+        }
 
         return Ci.ResultOutput.Emit(summary, gate, output, csv, ctx.Out, ctx.Err, ctx.Stop.IsCancellationRequested);
     }
