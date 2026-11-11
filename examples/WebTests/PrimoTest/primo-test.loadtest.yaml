@@ -4,7 +4,7 @@ name: Primo test DeoLoadTest
 runSettings:
   warmupSec: 0
   #iterations: 50
-  durationMin: 3
+  durationMin: 1
   samplingSec: 1
 
 scenarios:

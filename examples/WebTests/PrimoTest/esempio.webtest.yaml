@@ -12,3 +12,8 @@ steps:
       method: GET
       url: https://example.com/
     expectedStatus: 200
+  - name: Bing
+    request:
+      method: GET
+      url: https://www.bing.com/
+    expectedStatus: 200    
