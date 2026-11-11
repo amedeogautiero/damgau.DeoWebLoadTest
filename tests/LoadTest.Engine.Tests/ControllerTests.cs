@@ -386,6 +386,42 @@ public class ControllerTests
     }
 
     [Fact]
+    public async Task Controller_progress_exposes_test_counters_while_the_run_is_active()
+    {
+        var dir = WriteProject();
+        File.WriteAllText(Path.Combine(dir, "a.webtest.yaml"), "version: 1\\nname: A\\nbaseUrl: https://x.it\\nsteps:\\n  - { name: Home, request: { method: GET, url: / } }\\n");
+        File.WriteAllText(Path.Combine(dir, "run.loadtest.yaml"), """
+            version: 1
+            name: progress
+            runSettings: { warmupSec: 0, durationMin: 1, coolDownSec: 1, samplingSec: 1 }
+            scenarios:
+              - name: S
+                thinkProfile: { mode: off }
+                testMix: { model: users, tests: [ { test: a.webtest.yaml, percent: 100 } ] }
+                loadPattern: { type: constant, users: 1 }
+            rig:
+              agents:
+                - { name: ag1 }
+            """);
+
+        await using var h = new Harness();
+        await h.AddAgentAsync("id1", "ag1");
+        var orch = h.Orchestrator();
+        var planned = await orch.PlanAsync("run-progress", new RunRequest { LoadTestPath = Path.Combine(dir, "run.loadtest.yaml") });
+        var control = new RunControl();
+        var task = orch.ExecuteAsync(planned, control);
+
+        await WaitFor(() => planned.Progress.CompletedTests > 0);
+        Assert.Equal("Running", planned.Progress.State);
+        Assert.True(planned.Progress.CompletedTests > 0);
+        Assert.Equal(0, planned.Progress.FailedTests);
+
+        control.Stop(StopMode.Abort, "test progress");
+        var outcome = await task.WaitAsync(TimeSpan.FromSeconds(60));
+        Assert.Equal("Cancelled", outcome.Status);
+    }
+
+    [Fact]
     public async Task Abort_request_cancels_the_run_and_frees_the_agents()
     {
         var dir = WriteProject();
