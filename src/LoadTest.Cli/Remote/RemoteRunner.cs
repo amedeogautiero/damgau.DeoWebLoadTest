@@ -1,14 +1,17 @@
 using System.Globalization;
 using LoadTest.Cli.Args;
+using LoadTest.Contracts;
 using LoadTest.Controller.Api;
+using LoadTest.Controller.Runs;
 
 namespace LoadTest.Cli.Remote;
 
-/// <summary>Run su un controller: invio (opzionale) del progetto, avvio, avanzamento a polling, stop con Ctrl+C, riassunto finale.</summary>
+/// <summary>Run su un controller: invio (opzionale) del progetto, avvio, polling del progresso, stop con Ctrl+C, riassunto finale.</summary>
 public static class RemoteRunner
 {
     public static async Task<(RunSummaryDto Summary, Func<string> Csv)> RunAsync(
-        string loadTestFile, string controllerUrl, ParsedArgs p, int? seed, bool needCsv, CliContext ctx)
+        string loadTestFile, string controllerUrl, ParsedArgs p, int? seed, bool needCsv, CliContext ctx,
+        Action<RunProgressSnapshot>? onProgress = null)
     {
         var full = Path.GetFullPath(loadTestFile);
         if (!File.Exists(full)) throw new CliException(ExitCodes.Usage, $"file non trovato: {full}");
@@ -31,12 +34,15 @@ public static class RemoteRunner
 
         var runId = await client.StartRunAsync(body, CancellationToken.None);
         var quiet = p.Flag("quiet") || p.Get("json") == "-";
+        var live = onProgress is not null;
         if (!quiet) ctx.Out.WriteLine($"run {runId} avviata su {controllerUrl}");
 
         string last = "";
         bool stopSent = false, abortSent = false;
         var failures = 0;
-        Controller.Runs.RunSnapshot? snap;
+        long sequence = 0, previousRequests = 0;
+        DateTimeOffset? previousCapture = null;
+        RunSnapshot? snap;
         while (true)
         {
             if (ctx.Abort.IsCancellationRequested && !abortSent)
@@ -64,8 +70,17 @@ public static class RemoteRunner
             }
             if (snap is null) throw new CliException(ExitCodes.Infrastructure, $"il controller non conosce la run {runId}");
 
+            var captured = DateTimeOffset.UtcNow;
+            var rps = previousCapture is { } previous && captured > previous
+                ? Math.Max(0, snap.Requests - previousRequests) / (captured - previous).TotalSeconds
+                : 0;
+            var progress = CreateProgress(snap, captured, ++sequence, rps);
+            TryPublish(onProgress, progress);
+            previousCapture = captured;
+            previousRequests = snap.Requests;
+
             var line = string.Create(CultureInfo.InvariantCulture, $"[{snap.State}] utenti {snap.ActiveUsers} · richieste {snap.Requests} · errori {snap.Errors}");
-            if (!quiet && line != last) ctx.Out.WriteLine(line);
+            if (!quiet && !live && line != last) ctx.Out.WriteLine(line);
             last = line;
             if (snap.Status is not null) break;
             await Task.Delay(ctx.Services.PollInterval);
@@ -74,9 +89,102 @@ public static class RemoteRunner
         var summary = await client.GetSummaryAsync(runId, CancellationToken.None)
             ?? throw new CliException(ExitCodes.Infrastructure, $"il controller non ha i risultati della run {runId}");
         var csv = needCsv ? await client.GetSummaryCsvAsync(runId, CancellationToken.None) : "";
+
+        // Lo snapshot terminale arricchisce quello di polling con i conteggi dei test e le serie complete.
+        TryPublish(onProgress, CreateFinalProgress(snap!, summary, DateTimeOffset.UtcNow, ++sequence));
         return (summary, () => csv);
     }
 
+    private static RunProgressSnapshot CreateProgress(
+        RunSnapshot run, DateTimeOffset capturedUtc, long sequence, double requestsPerSecond) =>
+        new()
+        {
+            RunId = run.RunId,
+            Sequence = sequence,
+            Status = MapStatus(run.State, run.Status),
+            StartedUtc = run.StartedUtc,
+            CapturedUtc = capturedUtc,
+            ElapsedSeconds = run.StartedUtc is { } started
+                ? Math.Max(0, (capturedUtc - started).TotalSeconds) : 0,
+            ActiveUsers = run.ActiveUsers,
+            CompletedRequests = run.Requests,
+            FailedRequests = run.Errors,
+            RequestsPerSecond = requestsPerSecond
+        };
+
+    private static RunProgressSnapshot CreateFinalProgress(
+        RunSnapshot run, RunSummaryDto summary, DateTimeOffset capturedUtc, long sequence)
+    {
+        var elapsed = run.StartedUtc is { } started
+            ? Math.Max(0, (capturedUtc - started).TotalSeconds)
+            : Math.Max(0, summary.MeasuredSeconds);
+        var series = summary.Series.Select(s =>
+        {
+            if (!Enum.TryParse<RunProgressSeriesKind>(s.Kind, ignoreCase: true, out var kind))
+                return null;
+            return new RunProgressSeriesSnapshot
+            {
+                Kind = kind,
+                ScenarioName = s.Scenario,
+                TestName = s.Test,
+                PageName = s.Page,
+                RequestName = s.Request,
+                TransactionName = s.Transaction,
+                Count = s.Count,
+                Failed = s.Failed,
+                ErrorRatePercent = s.ErrorRatePercent,
+                OperationsPerSecond = s.PerSecond,
+                P50Milliseconds = s.P50Ms ?? 0,
+                P95Milliseconds = s.P95Ms ?? 0,
+                P99Milliseconds = s.P99Ms ?? 0,
+                MaxMilliseconds = s.MaxMs ?? 0,
+                BytesSent = s.BytesSent,
+                BytesReceived = s.BytesReceived
+            };
+        }).Where(s => s is not null).Cast<RunProgressSeriesSnapshot>().ToArray();
+
+        return new RunProgressSnapshot
+        {
+            RunId = run.RunId,
+            Sequence = sequence,
+            Status = MapStatus(run.State, summary.Status),
+            StartedUtc = summary.StartedUtc,
+            CapturedUtc = capturedUtc,
+            ElapsedSeconds = elapsed,
+            ActiveUsers = 0,
+            CompletedTests = summary.TestsCompleted,
+            FailedTests = summary.TestsFailed,
+            CompletedRequests = run.Requests,
+            FailedRequests = run.Errors,
+            RequestsPerSecond = series.Where(s => s.Kind == RunProgressSeriesKind.Request).Sum(s => s.OperationsPerSecond),
+            Series = series
+        };
+    }
+
+    private static RunProgressStatus MapStatus(string state, string? terminalStatus)
+    {
+        if (terminalStatus is not null)
+            return terminalStatus.Equals("Completed", StringComparison.OrdinalIgnoreCase)
+                ? RunProgressStatus.Completed
+                : terminalStatus.Equals("Cancelled", StringComparison.OrdinalIgnoreCase)
+                    ? RunProgressStatus.Cancelled
+                    : terminalStatus.Equals("Aborted", StringComparison.OrdinalIgnoreCase)
+                        ? RunProgressStatus.Failed
+                        : RunProgressStatus.Failed;
+
+        if (state.Contains("stop", StringComparison.OrdinalIgnoreCase)) return RunProgressStatus.Stopping;
+        if (state.Equals("Planned", StringComparison.OrdinalIgnoreCase)) return RunProgressStatus.Queued;
+        if (state.Equals("Setup", StringComparison.OrdinalIgnoreCase)
+            || state.Contains("prepar", StringComparison.OrdinalIgnoreCase)) return RunProgressStatus.Preparing;
+        return RunProgressStatus.Running;
+    }
+
+    private static void TryPublish(Action<RunProgressSnapshot>? callback, RunProgressSnapshot snapshot)
+    {
+        if (callback is null) return;
+        try { callback(snapshot); }
+        catch { /* Un consumer del progresso non deve interrompere il test remoto. */ }
+    }
 
     private static bool IsLoopback(string url) =>
         Uri.TryCreate(url, UriKind.Absolute, out var u) && (u.IsLoopback || string.Equals(u.Host, "localhost", StringComparison.OrdinalIgnoreCase));
