@@ -4,12 +4,16 @@
     <AssemblyName>LoadTest.Controller</AssemblyName>
   </PropertyGroup>
   <ItemGroup>
+    <!-- Dashboard servita dall'assembly: nessuna dipendenza da wwwroot sul filesystem. -->
+    <EmbeddedResource Include="wwwroot/**/*">
+      <LogicalName>LoadTest.Controller.wwwroot.%(RecursiveDir)%(Filename)%(Extension)</LogicalName>
+    </EmbeddedResource>
     <!-- versione scelta a memoria (rete non disponibile quando scritto): da verificare al primo restore -->
     <PackageReference Include="Grpc.AspNetCore" Version="2.71.0" />
-    <ProjectReference Include="..\LoadTest.Engine\LoadTest.Engine.csproj" />
-    <ProjectReference Include="..\LoadTest.Metrics\LoadTest.Metrics.csproj" />
-    <ProjectReference Include="..\LoadTest.Plugins\LoadTest.Plugins.csproj" />
-    <ProjectReference Include="..\LoadTest.Protocol\LoadTest.Protocol.csproj" />
-    <ProjectReference Include="..\LoadTest.Reports\LoadTest.Reports.csproj" />
+    <ProjectReference Include="..\\LoadTest.Engine\\LoadTest.Engine.csproj" />
+    <ProjectReference Include="..\\LoadTest.Metrics\\LoadTest.Metrics.csproj" />
+    <ProjectReference Include="..\\LoadTest.Plugins\\LoadTest.Plugins.csproj" />
+    <ProjectReference Include="..\\LoadTest.Protocol\\LoadTest.Protocol.csproj" />
+    <ProjectReference Include="..\\LoadTest.Reports\\LoadTest.Reports.csproj" />
   </ItemGroup>
 </Project>
