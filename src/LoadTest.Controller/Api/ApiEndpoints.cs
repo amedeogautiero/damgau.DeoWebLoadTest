@@ -1,4 +1,5 @@
 using System.Text.Json;
+using LoadTest.Contracts;
 using LoadTest.Controller.Agents;
 using LoadTest.Controller.Runs;
 using LoadTest.Protocol;
@@ -79,8 +80,8 @@ public static class ApiEndpoints
             }
 
             context.Response.StatusCode = StatusCodes.Status200OK;
-            context.Response.Headers.ContentType = "text/event-stream";
-            context.Response.Headers.CacheControl = "no-cache, no-store";
+            context.Response.ContentType = "text/event-stream";
+            context.Response.Headers["Cache-Control"] = "no-cache, no-store";
             context.Response.Headers.Append("X-Accel-Buffering", "no");
 
             var cancellationToken = context.RequestAborted;
