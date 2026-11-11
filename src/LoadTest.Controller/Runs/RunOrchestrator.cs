@@ -39,7 +39,7 @@ public sealed class RunOrchestrator(
         public string RunId => Run.RunId;
         public int MaxErrorDetails { get; } = maxErrorDetails;
         public int? StopOnErrors { get; } = stopOnErrors;
-        public long Requests, Errors, ErrorDetails;
+        public long Requests, Errors, CompletedTests, FailedTests, ErrorDetails;
         public volatile bool StopOnErrorsHit;
         public CancellationTokenSource Cts { get; } = new();
         public CancellationToken Cancel => Cts.Token;
@@ -233,6 +233,8 @@ public sealed class RunOrchestrator(
         TryDelete(run.WorkDir);
         progress.Requests = Interlocked.Read(ref rt.Requests);
         progress.Errors = Interlocked.Read(ref rt.Errors);
+        progress.CompletedTests = tests;
+        progress.FailedTests = failed;
         progress.Outcome = outcome;
         progress.State = "Finished";
         log.LogInformation("Run {Run} conclusa: {Status} {Reason}", run.RunId, status, reason);
@@ -308,6 +310,8 @@ public sealed class RunOrchestrator(
             run.Progress.ActiveUsers = ps.Sum(p => p.Conn.ActiveUsers);
             run.Progress.Requests = Interlocked.Read(ref rt.Requests);
             run.Progress.Errors = Interlocked.Read(ref rt.Errors);
+            run.Progress.CompletedTests = Interlocked.Read(ref rt.CompletedTests);
+            run.Progress.FailedTests = Interlocked.Read(ref rt.FailedTests);
 
             if (ps.All(p => p.FinishedTcs.Task.IsCompleted)) break;
             if (forceEnd is { } fe && now > fe)
@@ -394,11 +398,26 @@ public sealed class RunOrchestrator(
             return;
         }
 
-        long requests = 0, failed = 0;
+        long requests = 0, failedRequests = 0, completedTests = 0, failedTests = 0;
         foreach (var s in b.Series)
-            if (s.Key.HasPage || s.Key.HasRequest) { requests += s.Count; failed += s.Failed; }
+        {
+            if (s.Key.HasPage || s.Key.HasRequest)
+            {
+                requests += s.Count;
+                failedRequests += s.Failed;
+            }
+            else if (!s.Key.HasTransaction)
+            {
+                // Una serie senza page/request/transaction rappresenta il completamento del test.
+                completedTests += s.Count;
+                failedTests += s.Failed;
+            }
+        }
+
         Interlocked.Add(ref rt.Requests, requests);
-        var total = Interlocked.Add(ref rt.Errors, failed);
+        Interlocked.Add(ref rt.CompletedTests, completedTests);
+        Interlocked.Add(ref rt.FailedTests, failedTests);
+        var total = Interlocked.Add(ref rt.Errors, failedRequests);
         if (rt.StopOnErrors is { } n && total >= n) rt.StopOnErrorsHit = true;
     }
 

@@ -107,6 +107,8 @@ public static class RemoteRunner
             ElapsedSeconds = run.StartedUtc is { } started
                 ? Math.Max(0, (capturedUtc - started).TotalSeconds) : 0,
             ActiveUsers = run.ActiveUsers,
+            CompletedTests = run.CompletedTests,
+            FailedTests = run.FailedTests,
             CompletedRequests = run.Requests,
             FailedRequests = run.Errors,
             RequestsPerSecond = requestsPerSecond

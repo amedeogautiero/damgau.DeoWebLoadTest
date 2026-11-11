@@ -29,7 +29,7 @@ public sealed record RunOutcome(string Status, string Reason, long TestsComplete
 public sealed class RunProgress
 {
     private string _state = "Planned";
-    private long _requests, _errors;
+    private long _requests, _errors, _completedTests, _failedTests;
     private int _activeUsers;
 
     public string State { get => Volatile.Read(ref _state); set => Volatile.Write(ref _state, value); }
@@ -37,6 +37,8 @@ public sealed class RunProgress
     public int ActiveUsers { get => Volatile.Read(ref _activeUsers); set => Volatile.Write(ref _activeUsers, value); }
     public long Requests { get => Interlocked.Read(ref _requests); set => Interlocked.Exchange(ref _requests, value); }
     public long Errors { get => Interlocked.Read(ref _errors); set => Interlocked.Exchange(ref _errors, value); }
+    public long CompletedTests { get => Interlocked.Read(ref _completedTests); set => Interlocked.Exchange(ref _completedTests, value); }
+    public long FailedTests { get => Interlocked.Read(ref _failedTests); set => Interlocked.Exchange(ref _failedTests, value); }
     public RunOutcome? Outcome { get; set; }
     public System.Collections.Concurrent.ConcurrentDictionary<string, string> AgentStates { get; } = new(StringComparer.Ordinal);
 }
