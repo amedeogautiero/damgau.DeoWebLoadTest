@@ -213,7 +213,7 @@ public class CliTests
             if (path == "/api/runs/abc")
             {
                 var done = ++seen >= polls;
-                return Json(new RunSnapshot("abc", "ci", done ? "Finished" : "Running", DateTimeOffset.UtcNow, done ? finalStatus : null, null, 2, 10, 0, [], []));
+                return Json(new RunSnapshot("abc", "ci", done ? "Finished" : "Running", DateTimeOffset.UtcNow, done ? finalStatus : null, null, 2, 10, 0, 0, 0, [], [], []));
             }
             return new HttpResponseMessage(HttpStatusCode.NotFound);
         });
@@ -281,7 +281,7 @@ public class CliTests
         {
             var path = req.RequestUri!.AbsolutePath;
             if (path == "/api/agents") return Json(new[] { new AgentDto("id1", "ag1", "linux-x64", "Linux", 4, 8192, 0, false, 12, 0, null) });
-            if (path == "/api/runs/abc") return Json(new RunSnapshot("abc", "ci", "Running", null, null, null, 3, 7, 1, ["w"], [new AgentSnapshot("ag1", "Running")]));
+            if (path == "/api/runs/abc") return Json(new RunSnapshot("abc", "ci", "Running", null, null, null, 3, 7, 1, 0, 0, [], ["w"], [new AgentSnapshot("ag1", "Running")]));
             if (path == "/api/runs/abc/stop") return new HttpResponseMessage(HttpStatusCode.Accepted);
             return new HttpResponseMessage(HttpStatusCode.NotFound);
         });
