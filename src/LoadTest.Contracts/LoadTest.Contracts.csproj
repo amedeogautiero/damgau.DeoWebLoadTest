@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>LoadTest.Contracts</RootNamespace>
+    <AssemblyName>LoadTest.Contracts</AssemblyName>
+  </PropertyGroup>
+</Project>
