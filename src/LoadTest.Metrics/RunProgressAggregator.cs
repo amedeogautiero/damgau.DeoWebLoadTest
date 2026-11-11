@@ -1,3 +1,4 @@
+using HdrHistogram;
 using LoadTest.Contracts;
 
 namespace LoadTest.Metrics;
@@ -94,7 +95,7 @@ public sealed class RunProgressAggregator
                 .ThenBy(x => x.Key.Page, StringComparer.Ordinal)
                 .ThenBy(x => x.Key.Request, StringComparer.Ordinal)
                 .ThenBy(x => x.Key.Transaction, StringComparer.Ordinal)
-                .Select(x => ToProgressSeries(x.Key, x.Value))
+                .Select(x => ToProgressSeries(x.Key, x.Value, _measuredSeconds))
                 .ToArray();
 
             var tests = _series
@@ -135,7 +136,7 @@ public sealed class RunProgressAggregator
         }
     }
 
-    private static RunProgressSeriesSnapshot ToProgressSeries(MetricKey key, AggregateSeries aggregate)
+    private static RunProgressSeriesSnapshot ToProgressSeries(MetricKey key, AggregateSeries aggregate, double measuredSeconds)
     {
         var histogram = aggregate.Histogram;
         var hasTimings = histogram.TotalCount > 0;
@@ -169,7 +170,7 @@ public sealed class RunProgressAggregator
             ErrorRatePercent = aggregate.Count > 0
                 ? 100.0 * aggregate.Failed / aggregate.Count
                 : 0,
-            OperationsPerSecond = aggregate.Count,
+            OperationsPerSecond = measuredSeconds > 0 ? aggregate.Count / measuredSeconds : 0,
             P50Milliseconds = Percentile(50),
             P95Milliseconds = Percentile(95),
             P99Milliseconds = Percentile(99),
