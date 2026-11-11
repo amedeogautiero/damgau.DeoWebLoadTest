@@ -389,7 +389,7 @@ public class ControllerTests
     public async Task Controller_progress_exposes_test_counters_while_the_run_is_active()
     {
         var dir = WriteProject();
-        File.WriteAllText(Path.Combine(dir, "a.webtest.yaml"), "version: 1\\nname: A\\nbaseUrl: https://x.it\\nsteps:\\n  - { name: Home, request: { method: GET, url: / } }\\n");
+        File.WriteAllText(Path.Combine(dir, "a.webtest.yaml"), "version: 1\nname: A\nbaseUrl: https://x.it\nsteps:\n  - { name: Home, request: { method: GET, url: / } }\n");
         File.WriteAllText(Path.Combine(dir, "run.loadtest.yaml"), """
             version: 1
             name: progress
