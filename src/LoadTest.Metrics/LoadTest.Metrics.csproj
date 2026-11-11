@@ -3,7 +3,7 @@
     <RootNamespace>LoadTest.Metrics</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\\LoadTest.Contracts\\LoadTest.Contracts.csproj" />
+    <ProjectReference Include="..\LoadTest.Contracts\LoadTest.Contracts.csproj" />
   </ItemGroup>
   <ItemGroup>
     <!-- versione da verificare al primo restore (rete non disponibile quando scritto) -->
