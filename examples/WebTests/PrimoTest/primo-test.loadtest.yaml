@@ -1,0 +1,24 @@
+version: 1
+name: Primo test DeoLoadTest
+
+runSettings:
+  warmupSec: 0
+  #iterations: 50
+  durationMin: 3
+  samplingSec: 1
+
+scenarios:
+  - name: Utenti anonimi
+
+    thinkProfile:
+      mode: off
+
+    testMix:
+      model: tests
+      tests:
+        - test: esempio.webtest.yaml
+          percent: 100
+
+    loadPattern:
+      type: constant
+      users: 1

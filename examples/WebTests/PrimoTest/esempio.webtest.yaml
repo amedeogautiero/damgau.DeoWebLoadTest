@@ -1,0 +1,14 @@
+version: 1
+name: Test Example
+
+defaults:
+  timeoutSec: 15
+  followRedirects: true
+  parseDependentRequests: false
+
+steps:
+  - name: Homepage
+    request:
+      method: GET
+      url: https://example.com/
+    expectedStatus: 200
