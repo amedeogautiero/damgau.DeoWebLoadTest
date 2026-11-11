@@ -400,6 +400,8 @@ public sealed class RunOrchestrator(
             return;
         }
 
+        rt.ProgressAggregator.AddInterval(snap);
+
         long requests = 0, failedRequests = 0, completedTests = 0, failedTests = 0;
         foreach (var s in b.Series)
         {
