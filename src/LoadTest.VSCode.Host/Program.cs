@@ -2,12 +2,16 @@ namespace LoadTest.VSCode.Host;
 
 internal static class Program
 {
+    private const string ReadyMarker = "DEOLOADTEST_HOST_READY";
+
     private static async Task<int> Main()
     {
         try
         {
             var server = new StdioJsonRpcServer(Console.In, Console.Out, Console.Error);
-            await server.RunAsync();
+            var serverTask = server.RunAsync();
+            Console.Error.WriteLine(ReadyMarker);
+            await serverTask;
             return 0;
         }
         catch (Exception ex)
