@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { DebugRequest } from "./webTestDebugSession";
+import { DebugRequest, WebTestContextSnapshot } from "./webTestDebugSession";
 
 const MAX_DISPLAY_CHARS = 64 * 1024;
 
@@ -64,6 +64,8 @@ export class WebTestRequestInspector implements vscode.Disposable {
     const responseHeaders = this.formatValue(request.responseHeaders);
     const responseBody = this.formatValue(request.responseBody);
     const definition = this.formatValue(request.requestDefinition);
+    const contextAtStart = this.renderContext(request.contextAtStart, "Context at request start");
+    const contextAtEnd = this.renderContext(request.contextAtEnd, "Context after request");
     const startOffset = this.startOffsetMs(request, requests);
     const duration = typeof request.elapsedMicros === "number"
       ? `${(request.elapsedMicros / 1000).toFixed(2)} ms`
@@ -91,6 +93,12 @@ export class WebTestRequestInspector implements vscode.Disposable {
     pre { white-space: pre-wrap; overflow-wrap: anywhere; padding: 10px 12px; background: var(--vscode-textCodeBlock-background); border: 1px solid var(--vscode-panel-border); border-radius: 3px; font-family: var(--vscode-editor-font-family); font-size: var(--vscode-editor-font-size); }
     .empty { color: var(--vscode-descriptionForeground); font-style: italic; }
     .warning { color: var(--vscode-editorWarning-foreground); }
+    .context-snapshot { border: 1px solid var(--vscode-panel-border); border-radius: 4px; padding: 10px 12px; margin: 12px 0; }
+    h3 { font-size: .98em; margin: 16px 0 6px; }
+    table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    th, td { text-align: left; vertical-align: top; padding: 6px 8px; border-bottom: 1px solid var(--vscode-panel-border); overflow-wrap: anywhere; }
+    th:first-child, td:first-child { width: 25%; }
+    td pre { margin: 0; }
   </style>
 </head>
 <body>
@@ -124,8 +132,33 @@ export class WebTestRequestInspector implements vscode.Disposable {
 
   <h2>WebTest definition</h2>
   ${this.section("Original YAML request node (parsed)", definition)}
+
+  <h2>Request Context</h2>
+  ${contextAtStart}
+  ${contextAtEnd}
 </body>
 </html>`;
+  }
+
+  private renderContext(context: WebTestContextSnapshot | undefined, title: string): string {
+    if (!context) return `<div class="field"><span class="label">${this.escapeHtml(title)}:</span><span class="empty">Not available</span></div>`;
+    const renderRecord = (name: string, record?: Record<string, unknown>): string => {
+      const entries = Object.entries(record ?? {});
+      if (entries.length === 0) return `<div class="field"><span class="label">${this.escapeHtml(name)}:</span><span class="empty">No values</span></div>`;
+      const rows = entries.map(([key, value]) =>
+        `<tr><td>${this.escapeHtml(key)}</td><td><pre>${this.escapeHtml(this.formatValue(value).text)}</pre></td></tr>`
+      ).join("");
+      return `<h3>${this.escapeHtml(name)}</h3><table><thead><tr><th>Name</th><th>Value</th></tr></thead><tbody>${rows}</tbody></table>`;
+    };
+    const rows = Object.entries(context.dataRows ?? {}).map(([table, values]) =>
+      `<h3>Data Row: ${this.escapeHtml(table)}</h3>${renderRecord("Values", values)}`
+    ).join("");
+    return `<div class="context-snapshot"><h3>${this.escapeHtml(title)}</h3>
+      ${renderRecord("Variables", context.variables)}
+      ${rows || '<div class="field empty">No data rows</div>'}
+      ${renderRecord("Predefined values", context.predefined)}
+      ${renderRecord("User / execution context", context.user)}
+    </div>`;
   }
 
   private startOffsetMs(request: DebugRequest, requests: readonly DebugRequest[]): number | undefined {
