@@ -39,8 +39,10 @@ export class WebTestDebugPanelVertical implements vscode.Disposable {
           this.onClear();
         } else if (message?.command === "select" && Number.isInteger(message.requestId)) {
           this.selectedRequestId = message.requestId;
-          const request = this.sentRequests.get(this.selectedRequestId) ?? this.session.requests.find(item => item.id === this.selectedRequestId);
-          void this.panel?.webview.postMessage({ command: "selectedRequest", request: request ?? null });
+          const request = this.sentRequests.get(this.selectedRequestId) ?? null;
+          this.lastSentSelectedRequestId = this.selectedRequestId;
+          this.lastSentSelectedRequest = request;
+          void this.panel?.webview.postMessage({ command: "selectedRequest", request });
         }
       });
       this.panel.onDidDispose(() => {
