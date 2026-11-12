@@ -1,0 +1,231 @@
+import * as vscode from "vscode";
+import { DebugRequest, DebugSessionStatus, WebTestDebugSession } from "./webTestDebugSession";
+
+const MAX_DISPLAY_CHARS = 64 * 1024;
+
+export class WebTestDebugPanel implements vscode.Disposable {
+  private panel: vscode.WebviewPanel | undefined;
+  private selectedRequestId: number | undefined;
+  private disposed = false;
+
+  constructor(
+    private readonly session: WebTestDebugSession,
+    private readonly onRun: () => void,
+    private readonly onStop: () => void,
+    private readonly onClear: () => void
+  ) {}
+
+  show(): void {
+    if (this.disposed) return;
+    if (!this.panel) {
+      this.panel = vscode.window.createWebviewPanel(
+        "deoloadtest.debugPanel",
+        "DeoLoadTest Debug Panel",
+        vscode.ViewColumn.Beside,
+        { enableScripts: true, enableFindWidget: true, localResourceRoots: [] }
+      );
+      this.panel.webview.onDidReceiveMessage(message => {
+        if (message?.command === "run") this.onRun();
+        else if (message?.command === "stop") this.onStop();
+        else if (message?.command === "clear") this.onClear();
+        else if (message?.command === "select" && Number.isInteger(message.requestId)) {
+          this.selectedRequestId = message.requestId;
+          this.render();
+        }
+      });
+      this.panel.onDidDispose(() => {
+        this.panel = undefined;
+        this.selectedRequestId = undefined;
+      });
+    } else {
+      this.panel.reveal(vscode.ViewColumn.Beside, true);
+    }
+    this.render();
+  }
+
+  update(): void {
+    if (this.panel) this.render();
+  }
+
+  private render(): void {
+    if (!this.panel) return;
+    const requests = this.session.requests;
+    if (this.selectedRequestId === undefined || !requests.some(r => r.id === this.selectedRequestId)) {
+      this.selectedRequestId = requests.length ? requests[requests.length - 1].id : undefined;
+    }
+    const selected = requests.find(r => r.id === this.selectedRequestId);
+    this.panel.webview.html = this.renderHtml(requests, selected);
+  }
+
+  private renderHtml(requests: readonly DebugRequest[], selected?: DebugRequest): string {
+    const status = this.session.status;
+    const running = status === "running";
+    const completed = requests.filter(r => r.status !== "pending");
+    const succeeded = requests.filter(r => r.status === "succeeded").length;
+    const failed = requests.filter(r => r.status === "failed").length;
+    const durations = completed.filter(r => typeof r.elapsedMicros === "number").map(r => r.elapsedMicros! / 1000);
+    const sum = durations.reduce((a, b) => a + b, 0);
+    const average = durations.length ? sum / durations.length : 0;
+    const min = durations.length ? Math.min(...durations) : 0;
+    const max = durations.length ? Math.max(...durations) : 0;
+    const start = this.parseTime(this.session.startedAt);
+    const end = this.parseTime(this.session.finishedAt) ?? Date.now();
+    const elapsed = start === undefined ? 0 : Math.max(0, end - start);
+    const rate = elapsed > 0 ? completed.length / (elapsed / 1000) : 0;
+    const successRate = completed.length ? succeeded / completed.length * 100 : 0;
+    const statusLabel = status.charAt(0).toUpperCase() + status.slice(1);
+    const statusClass = status === "completed" ? "success" : status === "failed" ? "failure" : running ? "running" : "muted";
+    const rows = requests.map(request => {
+      const duration = typeof request.elapsedMicros === "number" ? request.elapsedMicros / 1000 : undefined;
+      const offset = this.startOffset(request, requests);
+      const selectedClass = selected?.id === request.id ? " selected" : "";
+      const requestStatus = request.status === "pending" ? "Running" : request.status === "succeeded" ? "Succeeded" : "Failed";
+      const requestClass = request.status === "succeeded" ? "success" : request.status === "failed" ? "failure" : "muted";
+      return '<button class="request-row' + selectedClass + '" data-select="' + request.id + '">' +
+        '<span class="request-main"><span class="request-id">#' + String(request.id).padStart(3, "0") + '</span>' +
+        '<span class="method">' + this.escape(request.method ?? "HTTP") + '</span>' +
+        '<span class="request-url">' + this.escape(this.shortUrl(request.url)) + '</span></span>' +
+        '<span class="request-meta"><span class="' + requestClass + '">' + requestStatus + '</span>' +
+        '<span>' + (duration === undefined ? "—" : this.ms(duration)) + '</span>' +
+        '<span>+' + (offset === undefined ? "—" : this.ms(offset)) + '</span></span></button>';
+    }).join("");
+
+    return '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">' +
+      '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; script-src \'unsafe-inline\';">' +
+      '<style>' + this.styles() + '</style></head><body>' +
+      '<header><div><h1>DeoLoadTest Debug Panel</h1><div class="test-name">' + this.escape(this.session.testName ?? "No WebTest selected") + '</div></div>' +
+      '<div class="toolbar"><button id="run" ' + (running ? "disabled" : "") + '>▶ Run</button>' +
+      '<button id="stop" class="danger" ' + (!running ? "disabled" : "") + '>■ Stop</button>' +
+      '<button id="clear" ' + (requests.length ? "" : "disabled") + '>Clear</button>' +
+      '<span class="status ' + statusClass + '"><i></i>' + statusLabel + '</span></div></header>' +
+      '<main><section class="explorer"><div class="section-heading">REQUEST EXPLORER <span>' + requests.length + '</span></div>' +
+      '<div class="request-list">' + (rows || '<div class="empty">Run a WebTest to inspect its HTTP requests.</div>') + '</div></section>' +
+      '<section class="inspector"><div class="section-heading">REQUEST INSPECTOR</div>' +
+      (selected ? this.renderRequest(selected, requests) : '<div class="empty">Select a request to inspect its details.</div>') + '</section></main>' +
+      '<section class="summary"><div class="section-heading">EXECUTION SUMMARY <span>' + statusLabel + '</span></div>' +
+      '<div class="metrics">' +
+      this.metric("Requests", String(requests.length)) + this.metric("Successful", String(succeeded), "success") +
+      this.metric("Failed", String(failed), failed ? "failure" : "") + this.metric("Success rate", completed.length ? successRate.toFixed(2) + "%" : "—") +
+      this.metric("Total duration", this.ms(elapsed)) + this.metric("Requests/sec", rate.toFixed(2)) +
+      this.metric("Avg response", durations.length ? this.ms(average) : "—") + this.metric("Min response", durations.length ? this.ms(min) : "—") +
+      this.metric("Max response", durations.length ? this.ms(max) : "—") + '</div>' +
+      '<div class="summary-footer"><span>Started: ' + this.escape(this.session.startedAt ?? "—") + '</span>' +
+      '<span>Finished: ' + this.escape(this.session.finishedAt ?? (running ? "In progress" : "—")) + '</span>' +
+      '<span>Run ID: ' + this.escape(this.session.runId ?? "—") + '</span></div>' +
+      (this.session.summary?.failures.length ? '<div class="failures"><strong>Failures</strong><ul>' + this.session.summary.failures.map(f => '<li>' + this.escape(f) + '</li>').join("") + '</ul></div>' : '') +
+      '</section><script>' +
+      'const vscode = acquireVsCodeApi();' +
+      'document.getElementById("run").addEventListener("click",()=>vscode.postMessage({command:"run"}));' +
+      'document.getElementById("stop").addEventListener("click",()=>vscode.postMessage({command:"stop"}));' +
+      'document.getElementById("clear").addEventListener("click",()=>vscode.postMessage({command:"clear"}));' +
+      'document.querySelectorAll("[data-select]").forEach(x=>x.addEventListener("click",()=>vscode.postMessage({command:"select",requestId:Number(x.dataset.select)})));' +
+      '</script></body></html>';
+  }
+
+  private renderRequest(request: DebugRequest, requests: readonly DebugRequest[]): string {
+    const startOffset = this.startOffset(request, requests);
+    const duration = typeof request.elapsedMicros === "number" ? this.ms(request.elapsedMicros / 1000) : request.status === "pending" ? "In progress" : "Unavailable";
+    const status = request.status === "succeeded" ? "Succeeded" : request.status === "failed" ? "Failed" : "Running";
+    const context = this.renderContext(request);
+    return '<div class="request-detail"><div class="detail-title"><strong>Request #' + request.id + ' · ' + this.escape(status) + '</strong>' +
+      '<span>' + this.escape(request.method ?? "HTTP") + ' · ' + this.escape(request.statusCode === undefined ? "No response" : String(request.statusCode) + " " + (request.reasonPhrase ?? "")) + '</span></div>' +
+      '<div class="url">' + this.escape(request.url ?? "URL unavailable") + '</div>' +
+      '<div class="detail-grid">' + this.detail("Request name", request.name ?? "—") + this.detail("Start offset", startOffset === undefined ? "—" : this.ms(startOffset)) +
+      this.detail("Duration", duration) + this.detail("Started", request.startedAt ?? "—") + this.detail("Completed", request.completedAt ?? "—") + '</div>' +
+      this.block("Request headers", request.requestHeaders) + this.block("Request body", request.requestBody) +
+      this.block("Response headers", request.responseHeaders) + this.block("Response body", request.responseBody) +
+      (request.errorType || request.errorMessage || request.exceptionDetails ? '<h3 class="failure">Error</h3>' + this.block("Type", request.errorType) + this.block("Message", request.errorMessage) + this.block("Exception chain", request.exceptionDetails) : '') +
+      this.block("WebTest definition (parsed YAML node)", request.requestDefinition) +
+      '<h3>Request context</h3>' + context + '</div>';
+  }
+
+  private renderContext(request: DebugRequest): string {
+    const before = request.contextAtStart;
+    const after = request.contextAtEnd;
+    if (!before && !after) return '<div class="empty">Context snapshot not available for this request.</div>';
+    const table = (title: string, oldValues: Record<string, unknown>, newValues: Record<string, unknown>) => {
+      const keys = Array.from(new Set([...Object.keys(oldValues), ...Object.keys(newValues)])).sort();
+      if (!keys.length) return '<h4>' + title + '</h4><div class="empty">No values</div>';
+      return '<h4>' + title + '</h4><table><thead><tr><th>Name</th><th>At request start</th><th>After request</th><th>Change</th></tr></thead><tbody>' +
+        keys.map(key => {
+          const hasOld = Object.prototype.hasOwnProperty.call(oldValues, key);
+          const hasNew = Object.prototype.hasOwnProperty.call(newValues, key);
+          const oldText = hasOld ? this.value(oldValues[key]) : "";
+          const newText = hasNew ? this.value(newValues[key]) : "";
+          const changed = hasOld && hasNew && oldText !== newText;
+          const state = !before || !after ? "Pending" : !hasOld ? "Added" : !hasNew ? "Removed" : changed ? "Modified" : "Unchanged";
+          const css = state === "Added" ? "success" : state === "Removed" ? "failure" : state === "Modified" ? "warning" : "";
+          return '<tr><td>' + this.escape(key) + '</td><td><pre>' + this.escape(oldText || "—") + '</pre></td><td><pre>' + this.escape(newText || "—") + '</pre></td><td class="' + css + '">' + state + '</td></tr>';
+        }).join("") + '</tbody></table>';
+    };
+    const flatten = (snapshot?: { dataRows?: Record<string, Record<string, string>> }) => {
+      const result: Record<string, unknown> = {};
+      for (const [tableName, values] of Object.entries(snapshot?.dataRows ?? {})) {
+        for (const [key, value] of Object.entries(values ?? {})) result[tableName + "." + key] = value;
+      }
+      return result;
+    };
+    return table("Variables", before?.variables ?? {}, after?.variables ?? {}) + table("Data rows", flatten(before), flatten(after));
+  }
+
+  private block(title: string, value: unknown): string {
+    if (value === undefined || value === null || value === "") return "";
+    return '<h3>' + this.escape(title) + '</h3><pre>' + this.escape(this.value(value)) + '</pre>';
+  }
+
+  private value(value: unknown): string {
+    let text: string;
+    if (typeof value === "string") {
+      text = value;
+      try { const parsed = JSON.parse(value); if (parsed !== null && typeof parsed === "object") text = JSON.stringify(parsed, null, 2); } catch { /* plain text */ }
+    } else {
+      try { text = JSON.stringify(value, null, 2) ?? String(value); } catch { text = String(value); }
+    }
+    return text.length > MAX_DISPLAY_CHARS ? text.slice(0, MAX_DISPLAY_CHARS) + "\n[Display truncated at 64 KB]" : text;
+  }
+
+  private metric(label: string, value: string, css = ""): string {
+    return '<div class="metric"><span>' + this.escape(label) + '</span><strong class="' + css + '">' + this.escape(value) + '</strong></div>';
+  }
+
+  private detail(label: string, value: string): string {
+    return '<div><span class="muted">' + this.escape(label) + '</span><strong>' + this.escape(value) + '</strong></div>';
+  }
+
+  private startOffset(request: DebugRequest, requests: readonly DebugRequest[]): number | undefined {
+    const first = requests.map(r => this.parseTime(r.startedAt)).filter((v): v is number => v !== undefined);
+    const current = this.parseTime(request.startedAt);
+    return current === undefined || !first.length ? undefined : Math.max(0, current - Math.min(...first));
+  }
+
+  private parseTime(value?: string): number | undefined {
+    if (!value) return undefined;
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+
+  private shortUrl(value?: string): string {
+    if (!value) return "(URL unavailable)";
+    try { const url = new URL(value); return url.host + url.pathname + url.search; } catch { return value; }
+  }
+
+  private ms(value: number): string { return value.toFixed(2) + " ms"; }
+
+  private escape(value: string): string {
+    return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+
+  private styles(): string {
+    return 'body{margin:0;padding:16px;color:var(--vscode-foreground);background:var(--vscode-editor-background);font-family:var(--vscode-font-family);font-size:var(--vscode-font-size)}' +
+      'header{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;border-bottom:1px solid var(--vscode-panel-border);padding:0 0 14px}h1{font-size:1.3em;margin:0 0 4px}.test-name,.muted,.empty{color:var(--vscode-descriptionForeground)}' +
+      '.toolbar{display:flex;align-items:center;gap:8px}.toolbar button{padding:5px 12px;color:var(--vscode-button-foreground);background:var(--vscode-button-background);border:0;border-radius:3px;cursor:pointer}.toolbar button:hover{background:var(--vscode-button-hoverBackground)}.toolbar button:disabled{opacity:.45;cursor:default}.toolbar .danger{background:var(--vscode-errorForeground)}' +
+      '.status{font-weight:600;margin-left:8px}.status i{display:inline-block;width:8px;height:8px;border-radius:50%;background:currentColor;margin-right:7px}.success{color:var(--vscode-testing-iconPassed)}.failure{color:var(--vscode-testing-iconFailed)}.running{color:var(--vscode-charts-blue)}.warning{color:var(--vscode-editorWarning-foreground)}' +
+      'main{display:grid;grid-template-columns:minmax(280px,34%) minmax(0,1fr);gap:14px;min-height:320px;margin-top:14px}.explorer,.inspector,.summary{border:1px solid var(--vscode-panel-border);border-radius:4px;min-width:0}.section-heading{font-weight:700;font-size:.9em;letter-spacing:.04em;padding:10px 12px;border-bottom:1px solid var(--vscode-panel-border);display:flex;justify-content:space-between}.request-list{max-height:480px;overflow:auto}.request-row{display:flex;flex-direction:column;gap:5px;width:100%;padding:9px 10px;text-align:left;color:inherit;background:transparent;border:0;border-bottom:1px solid var(--vscode-panel-border);cursor:pointer}.request-row:hover,.request-row.selected{background:var(--vscode-list-activeSelectionBackground);color:var(--vscode-list-activeSelectionForeground)}.request-main,.request-meta{display:flex;gap:9px;align-items:center;min-width:0}.request-url{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.request-id,.request-meta{font-size:.88em;color:var(--vscode-descriptionForeground)}.method{font-weight:700;min-width:42px}.request-meta{padding-left:48px;justify-content:space-between}.inspector{padding-bottom:12px;overflow:auto}.request-detail{padding:12px}.detail-title{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}.url{color:var(--vscode-textLink-foreground);overflow-wrap:anywhere;margin:10px 0}.detail-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;padding:10px 0;border-top:1px solid var(--vscode-panel-border);border-bottom:1px solid var(--vscode-panel-border)}.detail-grid div{display:flex;flex-direction:column;gap:4px}h3{font-size:1em;margin:18px 0 6px}h4{margin:14px 0 6px}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--vscode-textCodeBlock-background);padding:8px;border-radius:3px;margin:6px 0;font-family:var(--vscode-editor-font-family)}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{text-align:left;vertical-align:top;padding:6px;border-bottom:1px solid var(--vscode-panel-border);overflow-wrap:anywhere}td pre{max-height:160px;overflow:auto}.summary{margin-top:14px}.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;padding:12px}.metric{border:1px solid var(--vscode-panel-border);border-radius:3px;padding:9px;display:flex;flex-direction:column;gap:5px}.metric span{font-size:.88em;color:var(--vscode-descriptionForeground)}.metric strong{font-size:1.15em}.summary-footer{display:flex;gap:20px;flex-wrap:wrap;padding:0 12px 12px;color:var(--vscode-descriptionForeground);font-size:.88em}.failures{padding:0 12px 12px;color:var(--vscode-errorForeground)}.empty{padding:14px;font-style:italic}@media(max-width:800px){main{grid-template-columns:1fr}.request-list{max-height:240px}}';
+  }
+
+  dispose(): void {
+    this.disposed = true;
+    this.panel?.dispose();
+    this.panel = undefined;
+  }
+}
