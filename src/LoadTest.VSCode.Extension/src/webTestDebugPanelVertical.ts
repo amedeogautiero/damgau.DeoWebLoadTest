@@ -422,7 +422,7 @@ export class WebTestDebugPanelVertical implements vscode.Disposable {
   function updateSummary(state) {
     const completed = state.successfulRequests + state.failedRequests;
     document.getElementById("test-name").textContent = state.testName;
-    document.getElementById("request-count").textContent = String(state.totalRequests);
+    document.getElementById("request-count").textContent = String(state.visibleRequests);
     document.getElementById("metric-requests").textContent = String(state.totalRequests);
     document.getElementById("metric-success").textContent = String(state.successfulRequests);
     const failed = document.getElementById("metric-failed");
@@ -444,7 +444,7 @@ export class WebTestDebugPanelVertical implements vscode.Disposable {
     status.replaceChildren(element("i"), document.createTextNode(label));
     document.getElementById("run").disabled = state.status === "running";
     document.getElementById("stop").disabled = state.status !== "running";
-    document.getElementById("clear").disabled = state.totalRequests === 0;
+    document.getElementById("clear").disabled = state.visibleRequests === 0;
     const failures = document.getElementById("summary-failures");
     failures.replaceChildren();
     if (state.failures && state.failures.length) {
