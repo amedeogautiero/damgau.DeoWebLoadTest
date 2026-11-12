@@ -70,10 +70,13 @@ public class ScriptCompilerTests
     [Fact]
     public void Compiles_class_only_script_and_loads_it()
     {
-        var compiled = ScriptPackageCompiler.Compile(NewPackage(EchoRule), NewCache());
+        var compiled = ScriptPackageCompiler.Compile(NewPackage(EchoRule), NewCache(), emitSymbols: true);
 
         Assert.False(compiled.Manifest.IsScript);
         Assert.EndsWith(".dll", compiled.Manifest.Entry);
+        var pdbName = Path.GetFileNameWithoutExtension(compiled.Manifest.Entry) + ".pdb";
+        Assert.Contains(pdbName, compiled.Manifest.Files);
+        Assert.True(File.Exists(Path.Combine(compiled.Directory, pdbName)));
         using var plugin = PluginLoader.Load(compiled);
         var rule = plugin.Create<IExtractionRule>(PluginKind.Extraction).Single();
         Assert.Equal("AB", rule.Extract(null!, new ResponseContext { BodyText = "ab" }, new Dictionary<string, string>()).Value);
