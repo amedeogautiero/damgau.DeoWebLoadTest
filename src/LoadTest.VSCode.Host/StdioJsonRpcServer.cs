@@ -5,6 +5,7 @@ using LoadTest.Execution;
 using LoadTest.Engine.Runtime;
 using LoadTest.Engine.Model;
 using LoadTest.Sdk;
+using LoadTest.Plugins;
 using LoadTest.Plugins.Compilation;
 
 namespace LoadTest.VSCode.Host;
@@ -267,25 +268,34 @@ internal sealed class StdioJsonRpcServer(TextReader input, TextWriter output, Te
 
             var definition = WebTestLoader.LoadFile(path);
             using var http = new HttpClientExecutor();
-            var requestCount = 0;
-            var runner = new WebTestRunner(new EngineServices
-            {
-                Http = http,
-                ValidationLevel = ValidationLevel.High,
-                OnExecutionEvent = executionEvent =>
-                {
-                    if (executionEvent.EventType == "RequestStarted")
-                        Interlocked.Increment(ref requestCount);
 
-                    // A WebTest run is already a single-iteration debug session.
-                    // Forward the complete event stream; the extension decides what to display.
-                    WriteNotification("webtest.event", new
-                    {
-                        runId = active.RunId,
-                        @event = executionEvent
-                    });
-                }
+            // In locale, Host deve poter eseguire anche i passi code: senza passare dal Controller.
+            // La cache è condivisa tra le run locali; l'hash del pacchetto distingue le versioni.
+            var cacheRoot = Path.Combine(Path.GetTempPath(), "DeoLoadTest", "VSCode", "PluginCache");
+            var pluginCache = new PluginCache(cacheRoot);
+            var pluginRoot = Path.Combine(Path.GetDirectoryName(path)!, "plugins");
+            var catalog = PluginCatalog.FromDirectory(pluginRoot, pkg =>
+                ScriptPackageCompiler.Compile(pkg, pluginCache, emitSymbols: request.DebugMode));
+            using var pluginHost = new PluginHost(catalog);
+            var wiring = PluginWiring.Build(pluginHost, [definition],
+                compileSingleScript: scriptPath =>
+                    ScriptPackageCompiler.CompileSingleFile(scriptPath, pluginCache, emitSymbols: request.DebugMode));
+            using var codeStepHost = wiring.CodeSteps as IDisposable;
+
+            var requestCount = 0;
+            var services = wiring.CreateServices(http, ValidationLevel.High, executionEvent =>
+            {
+                if (executionEvent.EventType == "RequestStarted")
+                    Interlocked.Increment(ref requestCount);
+
+                // Forward the complete event stream; the extension decides what to display.
+                WriteNotification("webtest.event", new
+                {
+                    runId = active.RunId,
+                    @event = executionEvent
+                });
             });
+            var runner = new WebTestRunner(services);
 
             var testName = string.IsNullOrWhiteSpace(definition.Name)
                 ? Path.GetFileName(path)
