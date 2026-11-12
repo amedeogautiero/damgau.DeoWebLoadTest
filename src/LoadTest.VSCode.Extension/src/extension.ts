@@ -37,6 +37,8 @@ export function activate(context: vscode.ExtensionContext): void {
   const runOutput = vscode.window.createOutputChannel("DeoLoadTest Run");
   registerWebTestValidator(context);
   let activeRunId: string | undefined;
+  let activeWebTestRunId: string | undefined;
+  void vscode.commands.executeCommand("setContext", "deoloadtest.webTestRunning", false);
   const webTestDebugSession = new WebTestDebugSession();
   const requestExplorer = new WebTestRequestExplorer(webTestDebugSession);
   const requestInspector = new WebTestRequestInspector();
@@ -170,6 +172,8 @@ export function activate(context: vscode.ExtensionContext): void {
         runOutput.appendLine(`  Total duration: ${(result.elapsedMs ?? 0).toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} ms`);
         for (const failure of result.failures ?? []) runOutput.appendLine(`  ${failure}`);
         activeRunId = undefined;
+        activeWebTestRunId = undefined;
+        void vscode.commands.executeCommand("setContext", "deoloadtest.webTestRunning", false);
         if (result.success) {
           void vscode.window.showInformationMessage("WebTest completed successfully.");
         } else {
@@ -184,6 +188,8 @@ export function activate(context: vscode.ExtensionContext): void {
         runOutput.appendLine(`WebTest execution failed: ${params.error?.message ?? "Unknown error"}`);
         if (params.error?.details) runOutput.appendLine(params.error.details);
         activeRunId = undefined;
+        activeWebTestRunId = undefined;
+        void vscode.commands.executeCommand("setContext", "deoloadtest.webTestRunning", false);
         void vscode.window.showErrorMessage(
           `WebTest execution failed: ${params.error?.message ?? "Unknown error"}`
         );
@@ -194,6 +200,8 @@ export function activate(context: vscode.ExtensionContext): void {
         timingInspector.update(webTestDebugSession.requests, webTestDebugSession.status);
         runOutput.appendLine(`WebTest ${params.runId ?? activeRunId ?? ""} cancelled.`);
         activeRunId = undefined;
+        activeWebTestRunId = undefined;
+        void vscode.commands.executeCommand("setContext", "deoloadtest.webTestRunning", false);
         void vscode.window.showInformationMessage("WebTest cancelled.");
         break;
       default:
@@ -263,6 +271,10 @@ export function activate(context: vscode.ExtensionContext): void {
   const runWebTestCommand = vscode.commands.registerCommand(
     "deoloadtest.runWebTest",
     async () => {
+      if (webTestDebugSession.status === "running") {
+        void vscode.window.showWarningMessage("A WebTest is already running.");
+        return;
+      }
       if (!hostManager.isRunning || !communicationClient.isInitialized) {
         void vscode.window.showErrorMessage(
           "DeoLoadTest Host is not started and initialized. Run 'DeoLoadTest: Start Host' first."
@@ -291,8 +303,10 @@ export function activate(context: vscode.ExtensionContext): void {
 
         const result = await communicationClient.startWebTest(selection[0].fsPath);
         activeRunId = result.runId;
+        activeWebTestRunId = result.runId;
         const testName = selection[0].fsPath.split(/[\\/]/).pop()?.replace(/\.webtest\.(yaml|yml)$/i, "") ?? selection[0].fsPath;
         webTestDebugSession.start(result.runId, new Date().toISOString(), testName);
+        void vscode.commands.executeCommand("setContext", "deoloadtest.webTestRunning", true);
         requestExplorer.refresh();
         timingInspector.update(webTestDebugSession.requests, webTestDebugSession.status);
         runOutput.appendLine(`WebTest accepted. Run ID: ${result.runId}`);
@@ -300,6 +314,27 @@ export function activate(context: vscode.ExtensionContext): void {
         const message = error instanceof Error ? error.message : String(error);
         runOutput.appendLine(`Unable to start WebTest: ${message}`);
         void vscode.window.showErrorMessage(`Unable to start WebTest: ${message}`);
+      }
+    }
+  );
+
+  const stopWebTestCommand = vscode.commands.registerCommand(
+    "deoloadtest.stopWebTest",
+    async () => {
+      const runId = activeWebTestRunId;
+      if (!runId) {
+        void vscode.window.showInformationMessage("There is no active WebTest to stop.");
+        return;
+      }
+
+      try {
+        const result = await communicationClient.cancelRun(runId);
+        if (result.accepted) {
+          runOutput.appendLine("Cancellation requested for WebTest " + runId + ".");
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        void vscode.window.showErrorMessage("Unable to stop WebTest: " + message);
       }
     }
   );
@@ -357,6 +392,7 @@ export function activate(context: vscode.ExtensionContext): void {
     startHostCommand,
     runLoadTestCommand,
     runWebTestCommand,
+    stopWebTestCommand,
     importHarCommand,
     stopHostCommand,
     notificationSubscription,
