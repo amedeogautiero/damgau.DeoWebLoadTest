@@ -3,8 +3,12 @@ import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
 
+const HOST_READY_MARKER = "DEOLOADTEST_HOST_READY";
+const HOST_START_TIMEOUT_MS = 30000;
+
 export class HostManager implements vscode.Disposable {
   private process: ChildProcess | undefined;
+  private startup: Promise<void> | undefined;
   private readonly output = vscode.window.createOutputChannel("DeoLoadTest Host");
   private readonly stdoutListeners = new Set<(chunk: string) => void>();
 
@@ -12,7 +16,7 @@ export class HostManager implements vscode.Disposable {
 
   async start(): Promise<void> {
     if (this.process && this.process.exitCode === null) {
-      void vscode.window.showInformationMessage("DeoLoadTest Host is already running.");
+      if (this.startup) await this.startup;
       return;
     }
 
@@ -51,12 +55,46 @@ export class HostManager implements vscode.Disposable {
       }
     });
 
+    let resolveStartup!: () => void;
+    let rejectStartup!: (error: Error) => void;
+    let ready = false;
+    let stderrBuffer = "";
+
+    const startup = new Promise<void>((resolve, reject) => {
+      resolveStartup = resolve;
+      rejectStartup = reject;
+    });
+    this.startup = startup;
+
+    const timeout = setTimeout(() => {
+      if (!ready) {
+        rejectStartup(new Error(
+          `DeoLoadTest Host did not become ready within ${HOST_START_TIMEOUT_MS / 1000} seconds.`
+        ));
+      }
+    }, HOST_START_TIMEOUT_MS);
+
     child.stderr?.on("data", (data: Buffer) => {
-      this.output.append(data.toString());
+      const chunk = data.toString();
+      this.output.append(chunk);
+      stderrBuffer += chunk;
+
+      if (!ready && stderrBuffer.includes(HOST_READY_MARKER)) {
+        ready = true;
+        clearTimeout(timeout);
+        resolveStartup();
+      }
+
+      // Keep only a short tail in case the marker is split across chunks.
+      if (stderrBuffer.length > HOST_READY_MARKER.length * 2) {
+        stderrBuffer = stderrBuffer.slice(-HOST_READY_MARKER.length);
+      }
     });
 
     child.on("error", (error) => {
       this.output.appendLine(`Host process error: ${error.message}`);
+      clearTimeout(timeout);
+      if (!ready) rejectStartup(error);
       if (this.process === child) this.process = undefined;
     });
 
@@ -64,11 +102,25 @@ export class HostManager implements vscode.Disposable {
       this.output.appendLine(
         `Host process exited (code: ${code ?? "none"}, signal: ${signal ?? "none"}).`
       );
+      clearTimeout(timeout);
+      if (!ready) {
+        rejectStartup(new Error(
+          `DeoLoadTest Host exited before becoming ready (code: ${code ?? "none"}, signal: ${signal ?? "none"}).`
+        ));
+      }
       if (this.process === child) this.process = undefined;
     });
 
-    this.output.appendLine("Host process launched.");
-    void vscode.window.showInformationMessage("DeoLoadTest Host started.");
+    this.output.appendLine("Host process launched; waiting for readiness...");
+
+    try {
+      await startup;
+      this.output.appendLine("DeoLoadTest Host is ready.");
+      void vscode.window.showInformationMessage("DeoLoadTest Host is ready.");
+    } finally {
+      clearTimeout(timeout);
+      if (this.startup === startup) this.startup = undefined;
+    }
   }
 
   send(message: unknown): void {
