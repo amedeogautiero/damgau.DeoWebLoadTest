@@ -89,11 +89,13 @@ public static class ScriptCompiler
 public static class ScriptPackageCompiler
 {
     /// <summary>
-    /// Compila entry e `files` .csx insieme; gli altri `files` sono copiati. Il plugin.yaml del pacchetto compilato ha
+    /// Compila entry e `files` .csx insieme; gli altri `files` sono copiati.
+    /// Se `emitSymbols` è true, include anche il Portable PDB accanto alla DLL.
+    /// Il plugin.yaml del pacchetto compilato ha
     /// `entry: &lt;nome&gt;.dll` e non elenca più i .csx. Restituisce il pacchetto in cache: il suo Sha256 è quello da mettere nel manifest di PrepareRun.
     /// </summary>
     public static PluginPackage Compile(PluginPackage source, PluginCache cache, IReadOnlyList<MetadataReference>? references = null,
-        string? signingPrivateKey = null)
+        string? signingPrivateKey = null, bool emitSymbols = false)
     {
         var m = source.Manifest;
         if (!m.IsScript) throw new ArgumentException("il pacchetto non ha un entry .csx", nameof(source));
@@ -107,20 +109,31 @@ public static class ScriptPackageCompiler
             f => File.ReadAllText(Path.Combine(source.Directory, f.Replace('/', Path.DirectorySeparatorChar))));
 
         var asmName = SafeName(m.Name);
-        var dll = ScriptCompiler.Compile(asmName, sources, references);
+        var compilation = emitSymbols
+            ? ScriptCompiler.CompileWithSymbols(asmName, sources, references)
+            : new ScriptCompilationResult(ScriptCompiler.Compile(asmName, sources, references), null);
 
         var tmp = Path.Combine(Path.GetTempPath(), "loadtest-csx-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(tmp);
         try
         {
-            File.WriteAllBytes(Path.Combine(tmp, asmName + ".dll"), dll);
+            File.WriteAllBytes(Path.Combine(tmp, asmName + ".dll"), compilation.Assembly);
+
+            var packageFiles = new List<string>(others);
+            if (compilation.Pdb is not null)
+            {
+                var pdbName = asmName + ".pdb";
+                File.WriteAllBytes(Path.Combine(tmp, pdbName), compilation.Pdb);
+                packageFiles.Add(pdbName);
+            }
+
             foreach (var f in others)
             {
                 var dest = Path.Combine(tmp, f.Replace('/', Path.DirectorySeparatorChar));
                 Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
                 File.Copy(Path.Combine(source.Directory, f.Replace('/', Path.DirectorySeparatorChar)), dest);
             }
-            File.WriteAllText(Path.Combine(tmp, "plugin.yaml"), ManifestYaml(m, asmName + ".dll", others));
+            File.WriteAllText(Path.Combine(tmp, "plugin.yaml"), ManifestYaml(m, asmName + ".dll", packageFiles));
             var added = cache.Add(PluginPackage.Open(tmp));
             if (signingPrivateKey is not null) PluginSigning.SignPackage(added, signingPrivateKey);   // P10 bis: firma del pacchetto compilato
             return added;
@@ -133,7 +146,7 @@ public static class ScriptPackageCompiler
     /// `kinds: [codedTest]`, versione 1.0.0, sdk = major.minor dell'host (PROPOSTA P2).
     /// </summary>
     public static PluginPackage CompileSingleFile(string csxPath, PluginCache cache, IReadOnlyList<MetadataReference>? references = null,
-        string? signingPrivateKey = null)
+        string? signingPrivateKey = null, bool emitSymbols = false)
     {
         var name = Path.GetFileNameWithoutExtension(csxPath);
         var host = PluginLoader.HostSdkVersion;
@@ -149,7 +162,7 @@ public static class ScriptPackageCompiler
                 Kinds = [PluginKind.CodedTest], Entry = file, Files = []
             };
             File.WriteAllText(Path.Combine(tmp, "plugin.yaml"), ManifestYaml(implicitManifest, file, []));
-            return Compile(PluginPackage.Open(tmp), cache, references, signingPrivateKey);
+            return Compile(PluginPackage.Open(tmp), cache, references, signingPrivateKey, emitSymbols);
         }
         finally { Directory.Delete(tmp, true); }
     }
