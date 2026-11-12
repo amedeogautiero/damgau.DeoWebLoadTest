@@ -322,6 +322,9 @@ export function activate(context: vscode.ExtensionContext): void {
     importHarCommand,
     stopHostCommand,
     notificationSubscription,
+    requestExplorerView,
+    requestExplorer,
+    focusRequestExplorerCommand,
     communicationClient,
     hostManager,
     runOutput
