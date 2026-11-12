@@ -17,7 +17,8 @@
     "onCommand:deoloadtest.stopHost",
     "onCommand:deoloadtest.runLoadTest",
     "onCommand:deoloadtest.runWebTest",
-    "onCommand:deoloadtest.importHar"
+    "onCommand:deoloadtest.importHar",
+    "onCommand:deoloadtest.focusRequestExplorer"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -45,6 +46,25 @@
       {
         "command": "deoloadtest.importHar",
         "title": "DeoLoadTest: Import HAR"
+      },
+      {
+        "command": "deoloadtest.focusRequestExplorer",
+        "title": "DeoLoadTest: Focus Request Explorer"
+      }
+    ],
+    "views": {
+      "explorer": [
+        {
+          "id": "deoloadtest.requestExplorer",
+          "name": "Request Explorer",
+          "when": "true"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "deoloadtest.requestExplorer",
+        "contents": "Run a WebTest to inspect its HTTP requests.\n[Run WebTest](command:deoloadtest.runWebTest)"
       }
     ]
   },
