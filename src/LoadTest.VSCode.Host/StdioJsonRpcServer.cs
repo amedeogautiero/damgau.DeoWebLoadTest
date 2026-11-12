@@ -27,6 +27,7 @@ internal sealed class StdioJsonRpcServer(TextReader input, TextWriter output, Te
         public string? ResultsDatabasePath { get; set; }
         public string? RunName { get; set; }
         public int? Seed { get; set; }
+        public bool DebugMode { get; set; }
     }
 
     private sealed class CancelRunParams
@@ -223,7 +224,7 @@ internal sealed class StdioJsonRpcServer(TextReader input, TextWriter output, Te
                     runId = active.RunId,
                     snapshot
                 }),
-                OnExecutionEvent = executionEvent =>
+                OnExecutionEvent = request.DebugMode ? executionEvent =>
                 {
                     var notification = executionEvent.EventType switch
                     {
@@ -236,7 +237,7 @@ internal sealed class StdioJsonRpcServer(TextReader input, TextWriter output, Te
                     };
                     if (notification is not null)
                         WriteNotification(notification, new { runId = active.RunId, @event = executionEvent });
-                },
+                } : null,
                 OnObserverError = ex => error.WriteLine("observer warning: " + ex.Message)
             }, active.Cancellation.Token);
 
