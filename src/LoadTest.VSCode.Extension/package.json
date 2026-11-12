@@ -19,7 +19,8 @@
     "onCommand:deoloadtest.runWebTest",
     "onCommand:deoloadtest.importHar",
     "onCommand:deoloadtest.focusRequestExplorer",
-    "onCommand:deoloadtest.showTimingInspector"
+    "onCommand:deoloadtest.showTimingInspector",
+    "onCommand:deoloadtest.clearRequestExplorer"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -55,13 +56,18 @@
       {
         "command": "deoloadtest.showTimingInspector",
         "title": "DeoLoadTest: Show Timing Inspector"
+      },
+      {
+        "command": "deoloadtest.clearRequestExplorer",
+        "title": "DeoLoadTest: Clear Requests",
+        "icon": "$(trash)"
       }
     ],
     "views": {
       "explorer": [
         {
           "id": "deoloadtest.requestExplorer",
-          "name": "Request Explorer",
+          "name": "DeoLoadTest - Request Explorer",
           "when": "true"
         }
       ]
@@ -71,7 +77,16 @@
         "view": "deoloadtest.requestExplorer",
         "contents": "Run a WebTest to inspect its HTTP requests.\n[Run WebTest](command:deoloadtest.runWebTest)"
       }
-    ]
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "deoloadtest.clearRequestExplorer",
+          "when": "view == deoloadtest.requestExplorer",
+          "group": "navigation"
+        }
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
