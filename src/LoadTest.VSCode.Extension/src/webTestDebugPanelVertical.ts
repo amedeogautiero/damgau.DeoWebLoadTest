@@ -7,6 +7,7 @@ export class WebTestDebugPanelVertical implements vscode.Disposable {
   private panel: vscode.WebviewPanel | undefined;
   private selectedRequestId: number | undefined;
   private disposed = false;
+  private webviewInitialized = false;
 
   constructor(
     private readonly session: WebTestDebugSession,
@@ -24,6 +25,7 @@ export class WebTestDebugPanelVertical implements vscode.Disposable {
         vscode.ViewColumn.Beside,
         { enableScripts: true, enableFindWidget: true, localResourceRoots: [] }
       );
+      this.webviewInitialized = false;
       this.panel.webview.onDidReceiveMessage(message => {
         if (message?.command === "run") this.onRun();
         else if (message?.command === "stop") this.onStop();
@@ -36,6 +38,7 @@ export class WebTestDebugPanelVertical implements vscode.Disposable {
       this.panel.onDidDispose(() => {
         this.panel = undefined;
         this.selectedRequestId = undefined;
+        this.webviewInitialized = false;
       });
     } else {
       this.panel.reveal(vscode.ViewColumn.Beside, true);
@@ -54,7 +57,13 @@ export class WebTestDebugPanelVertical implements vscode.Disposable {
       this.selectedRequestId = requests.length ? requests[requests.length - 1].id : undefined;
     }
     const selected = requests.find(r => r.id === this.selectedRequestId);
-    this.panel.webview.html = this.renderHtml(requests, selected);
+    const html = this.renderHtml(requests, selected);
+    if (!this.webviewInitialized) {
+      this.panel.webview.html = html;
+      this.webviewInitialized = true;
+    } else {
+      void this.panel.webview.postMessage({ command: "refresh", html });
+    }
   }
 
   private renderHtml(requests: readonly DebugRequest[], selected?: DebugRequest): string {
@@ -115,10 +124,22 @@ export class WebTestDebugPanelVertical implements vscode.Disposable {
       (this.session.summary?.failures.length ? '<div class="failures"><strong>Failures</strong><ul>' + this.session.summary.failures.map(f => '<li>' + this.escape(f) + '</li>').join("") + '</ul></div>' : '') +
       '</section><script>' +
       'const vscode = acquireVsCodeApi();' +
-      'document.getElementById("run").addEventListener("click",()=>vscode.postMessage({command:"run"}));' +
-      'document.getElementById("stop").addEventListener("click",()=>vscode.postMessage({command:"stop"}));' +
-      'document.getElementById("clear").addEventListener("click",()=>vscode.postMessage({command:"clear"}));' +
-      'document.querySelectorAll("[data-select]").forEach(x=>x.addEventListener("click",()=>vscode.postMessage({command:"select",requestId:Number(x.dataset.select)})));' +
+      'document.addEventListener("click",event=>{' +
+      'const target=event.target.closest("button");if(!target)return;' +
+      'if(target.id==="run")vscode.postMessage({command:"run"});' +
+      'else if(target.id==="stop")vscode.postMessage({command:"stop"});' +
+      'else if(target.id==="clear")vscode.postMessage({command:"clear"});' +
+      'else if(target.dataset.select)vscode.postMessage({command:"select",requestId:Number(target.dataset.select)});' +
+      '});' +
+      'window.addEventListener("message",event=>{' +
+      'const message=event.data;if(message?.command!=="refresh"||typeof message.html!=="string")return;' +
+      'const list=document.querySelector(".request-list"),inspector=document.querySelector(".inspector");' +
+      'const listTop=list?.scrollTop??0,inspectorTop=inspector?.scrollTop??0;' +
+      'const parsed=new DOMParser().parseFromString(message.html,"text/html");' +
+      'document.body.innerHTML=parsed.body.innerHTML;' +
+      'const newList=document.querySelector(".request-list"),newInspector=document.querySelector(".inspector");' +
+      'if(newList)newList.scrollTop=listTop;if(newInspector)newInspector.scrollTop=inspectorTop;' +
+      '});' +
       '</script></body></html>';
   }
 
