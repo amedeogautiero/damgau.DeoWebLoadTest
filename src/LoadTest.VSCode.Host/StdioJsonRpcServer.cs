@@ -76,6 +76,7 @@ internal sealed class StdioJsonRpcServer(TextReader input, TextWriter output, Te
     {
         if (message.ValueKind != JsonValueKind.Object ||
             !message.TryGetProperty("jsonrpc", out var version) ||
+            version.ValueKind != JsonValueKind.String ||
             version.GetString() != "2.0" ||
             !message.TryGetProperty("method", out var methodElement) ||
             methodElement.ValueKind != JsonValueKind.String)
@@ -126,8 +127,9 @@ internal sealed class StdioJsonRpcServer(TextReader input, TextWriter output, Te
                     if (string.IsNullOrWhiteSpace(request.LoadTestFile))
                         throw new RpcException(-32602, "loadTestFile is required");
 
-                    var runId = StartRun(request);
-                    WriteResult(id, new { runId });
+                    var active = ReserveRun();
+                    WriteResult(id, new { runId = active.RunId });
+                    LaunchRun(active, request);
                     break;
                 }
 
@@ -167,7 +169,7 @@ internal sealed class StdioJsonRpcServer(TextReader input, TextWriter output, Te
         return Task.CompletedTask;
     }
 
-    private string StartRun(StartRunParams request)
+    private ActiveRun ReserveRun()
     {
         lock (_runGate)
         {
@@ -176,9 +178,13 @@ internal sealed class StdioJsonRpcServer(TextReader input, TextWriter output, Te
 
             var active = new ActiveRun(Guid.NewGuid().ToString("N"));
             _activeRun = active;
-            active.Task = Task.Run(() => ExecuteRunAsync(active, request));
-            return active.RunId;
+            return active;
         }
+    }
+
+    private void LaunchRun(ActiveRun active, StartRunParams request)
+    {
+        active.Task = Task.Run(() => ExecuteRunAsync(active, request));
     }
 
     private void CancelRun(string runId)
