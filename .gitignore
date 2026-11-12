@@ -397,3 +397,5 @@ FodyWeavers.xsd
 # JetBrains Rider
 *.sln.iml
 /GitHubApiKey.txt
+# VS Code extension generated output
+/src/LoadTest.VSCode.Extension/out/
