@@ -63,7 +63,21 @@ public static class PluginLoader
         var ctx = new PluginLoadContext(pkg.Directory);
         try
         {
-            var asm = ctx.LoadFromAssemblyPath(pkg.EntryPath);
+            var pdbPath = Path.ChangeExtension(pkg.EntryPath, ".pdb");
+            Assembly asm;
+            if (File.Exists(pdbPath))
+            {
+                // LoadFromStream associa esplicitamente il Portable PDB all'assembly:
+                // il debugger può risolvere i sequence point nel sorgente originale.
+                using var assemblyStream = File.OpenRead(pkg.EntryPath);
+                using var symbolsStream = File.OpenRead(pdbPath);
+                asm = ctx.LoadFromStream(assemblyStream, symbolsStream);
+            }
+            else
+            {
+                // Compatibilità con i pacchetti già compilati senza simboli.
+                asm = ctx.LoadFromAssemblyPath(pkg.EntryPath);
+            }
             var types = new List<PluginType>();
             foreach (var kind in m.Kinds)
             {
