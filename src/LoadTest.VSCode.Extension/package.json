@@ -44,7 +44,8 @@
       },
       {
         "command": "deoloadtest.runWebTest",
-        "title": "DeoLoadTest: Run WebTest"
+        "title": "DeoLoadTest: Run WebTest",
+        "icon": "$(play)"
       },
       {
         "command": "deoloadtest.importHar",
@@ -67,11 +68,6 @@
         "command": "deoloadtest.stopWebTest",
         "title": "DeoLoadTest: Stop WebTest",
         "icon": "$(debug-stop)"
-      },
-      {
-        "command": "deoloadtest.runWebTest",
-        "title": "DeoLoadTest: Run WebTest",
-        "icon": "$(play)"
       }
     ],
     "views": {
