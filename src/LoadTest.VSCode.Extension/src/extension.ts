@@ -96,6 +96,13 @@ export function activate(context: vscode.ExtensionContext): void {
   const runLoadTestCommand = vscode.commands.registerCommand(
     "deoloadtest.runLoadTest",
     async () => {
+      if (!hostManager.isRunning || !communicationClient.isInitialized) {
+        void vscode.window.showErrorMessage(
+          "DeoLoadTest Host is not started and initialized. Run 'DeoLoadTest: Start Host' first."
+        );
+        return;
+      }
+
       const selection = await vscode.window.showOpenDialog({
         canSelectMany: false,
         openLabel: "Run Load Test",
@@ -106,9 +113,6 @@ export function activate(context: vscode.ExtensionContext): void {
       if (!selection?.length) return;
 
       try {
-        await hostManager.start();
-        await communicationClient.initialize();
-
         runOutput.clear();
         runOutput.show(true);
         runOutput.appendLine(`Starting load test: ${selection[0].fsPath}`);
@@ -127,7 +131,10 @@ export function activate(context: vscode.ExtensionContext): void {
 
   const stopHostCommand = vscode.commands.registerCommand(
     "deoloadtest.stopHost",
-    () => hostManager.stop()
+    async () => {
+      communicationClient.resetInitialization();
+      await hostManager.stop();
+    }
   );
 
   context.subscriptions.push(
