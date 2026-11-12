@@ -20,7 +20,8 @@
     "onCommand:deoloadtest.importHar",
     "onCommand:deoloadtest.focusRequestExplorer",
     "onCommand:deoloadtest.showTimingInspector",
-    "onCommand:deoloadtest.clearRequestExplorer"
+    "onCommand:deoloadtest.clearRequestExplorer",
+    "onCommand:deoloadtest.stopWebTest"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -61,6 +62,16 @@
         "command": "deoloadtest.clearRequestExplorer",
         "title": "DeoLoadTest: Clear Requests",
         "icon": "$(trash)"
+      },
+      {
+        "command": "deoloadtest.stopWebTest",
+        "title": "DeoLoadTest: Stop WebTest",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "deoloadtest.runWebTest",
+        "title": "DeoLoadTest: Run WebTest",
+        "icon": "$(play)"
       }
     ],
     "views": {
@@ -80,6 +91,16 @@
     ],
     "menus": {
       "view/title": [
+        {
+          "command": "deoloadtest.runWebTest",
+          "when": "view == deoloadtest.requestExplorer && !deoloadtest.webTestRunning",
+          "group": "navigation@1"
+        },
+        {
+          "command": "deoloadtest.stopWebTest",
+          "when": "view == deoloadtest.requestExplorer && deoloadtest.webTestRunning",
+          "group": "navigation@2"
+        },
         {
           "command": "deoloadtest.clearRequestExplorer",
           "when": "view == deoloadtest.requestExplorer",
