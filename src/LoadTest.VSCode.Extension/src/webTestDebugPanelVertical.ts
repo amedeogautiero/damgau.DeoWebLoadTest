@@ -39,7 +39,7 @@ export class WebTestDebugPanelVertical implements vscode.Disposable {
           this.onClear();
         } else if (message?.command === "select" && Number.isInteger(message.requestId)) {
           this.selectedRequestId = message.requestId;
-          const request = this.session.requests.find(item => item.id === this.selectedRequestId);
+          const request = this.sentRequests.get(this.selectedRequestId) ?? this.session.requests.find(item => item.id === this.selectedRequestId);
           void this.panel?.webview.postMessage({ command: "selectedRequest", request: request ?? null });
         }
       });
@@ -58,36 +58,48 @@ export class WebTestDebugPanelVertical implements vscode.Disposable {
     }
   }
 
-  update(): void {
-    if (this.panel && this.webviewReady) this.sendSnapshot(false);
+  update(changedRequestId?: number): void {
+    if (this.panel && this.webviewReady) this.sendSnapshot(false, changedRequestId);
   }
 
-  private sendSnapshot(force: boolean): void {
+  private sendSnapshot(force: boolean, changedRequestId?: number): void {
     if (!this.panel || !this.webviewReady) return;
 
     const requests = this.session.requests;
-    const currentIds = new Set(requests.map(request => request.id));
-    const removedRequestIds = Array.from(this.sentRequests.keys()).filter(id => !currentIds.has(id));
-    const resetRequests = requests.length === 0 && this.sentRequests.size > 0;
+    const resetRequests = force || (requests.length === 0 && this.sentRequests.size > 0);
+    const removedRequestIds: number[] = [];
+
     if (resetRequests) {
+      if (!force) removedRequestIds.push(...this.sentRequests.keys());
       this.sentRequests.clear();
       this.selectedRequestId = undefined;
     }
 
     const changedRequests: DebugRequest[] = [];
-    for (const request of requests) {
-      if (force || this.sentRequests.get(request.id) !== request) {
+    if (force) {
+      for (const request of requests) {
+        changedRequests.push(request);
+        this.sentRequests.set(request.id, request);
+      }
+    } else if (changedRequestId !== undefined) {
+      const request = requests[requests.length - 1]?.id === changedRequestId
+        ? requests[requests.length - 1]
+        : requests.find(item => item.id === changedRequestId);
+      if (request && this.sentRequests.get(request.id) !== request) {
         changedRequests.push(request);
         this.sentRequests.set(request.id, request);
       }
     }
-    for (const id of removedRequestIds) this.sentRequests.delete(id);
 
-    if (this.selectedRequestId === undefined || !currentIds.has(this.selectedRequestId)) {
+    if (this.selectedRequestId === undefined || !this.sentRequests.has(this.selectedRequestId)) {
       this.selectedRequestId = requests.length ? requests[requests.length - 1].id : undefined;
     }
-    const selectedRequest = requests.find(request => request.id === this.selectedRequestId) ?? null;
-    const selectedChanged = force || this.selectedRequestId !== this.lastSentSelectedRequestId || selectedRequest !== this.lastSentSelectedRequest;
+    const selectedRequest = this.selectedRequestId === undefined
+      ? null
+      : this.sentRequests.get(this.selectedRequestId) ?? null;
+    const selectedChanged = force ||
+      this.selectedRequestId !== this.lastSentSelectedRequestId ||
+      selectedRequest !== this.lastSentSelectedRequest;
     this.lastSentSelectedRequestId = this.selectedRequestId;
     this.lastSentSelectedRequest = selectedRequest;
 
@@ -118,9 +130,9 @@ export class WebTestDebugPanelVertical implements vscode.Disposable {
       maxMs: durations.length ? Math.max(...durations) : null,
       failures: this.session.summary?.failures ?? [],
       requests: changedRequests,
-      removedRequestIds: force ? [] : removedRequestIds,
-      resetRequests: force || resetRequests,
-      selectedRequest
+      removedRequestIds,
+      resetRequests,
+      selectedRequest: selectedChanged ? selectedRequest : undefined
     });
   }
 
