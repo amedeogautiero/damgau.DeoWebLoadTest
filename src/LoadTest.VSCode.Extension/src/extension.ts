@@ -157,14 +157,14 @@ export function activate(context: vscode.ExtensionContext): void {
             ];
             if (event.exceptionDetails) {
               details.push("  Exception chain:");
-              details.push(...event.exceptionDetails.split("\n").map(line => `    ${line}`));
+              details.push(...event.exceptionDetails.split("\\n").map(line => `    ${line}`));
             }
             if (event.requestDefinition !== undefined) {
               details.push("  YAML request node (parsed):");
               details.push(...JSON.stringify(event.requestDefinition, null, 2)
-                .split("\n").map(line => `    ${line}`));
+                .split("\\n").map(line => `    ${line}`));
             }
-            webTestFailureDetails.push(details.join("\n"));
+            webTestFailureDetails.push(details.join("\\n"));
           }
         }
         break;
@@ -175,7 +175,7 @@ export function activate(context: vscode.ExtensionContext): void {
         requestExplorer.refresh();
         timingInspector.update(webTestDebugSession.requests, webTestDebugSession.status);
         debugPanel.update();
-          verticalDebugPanel.update();
+        verticalDebugPanel.update();
         const total = webTestSuccessfulRequests + webTestFailedRequests;
         runOutput.appendLine("");
         runOutput.appendLine("Requests:");
@@ -208,7 +208,7 @@ export function activate(context: vscode.ExtensionContext): void {
         requestExplorer.refresh();
         timingInspector.update(webTestDebugSession.requests, webTestDebugSession.status);
         debugPanel.update();
-          verticalDebugPanel.update();
+        verticalDebugPanel.update();
         runOutput.appendLine(`WebTest execution failed: ${params.error?.message ?? "Unknown error"}`);
         if (params.error?.details) runOutput.appendLine(params.error.details);
         activeRunId = undefined;
@@ -223,7 +223,7 @@ export function activate(context: vscode.ExtensionContext): void {
         requestExplorer.refresh();
         timingInspector.update(webTestDebugSession.requests, webTestDebugSession.status);
         debugPanel.update();
-          verticalDebugPanel.update();
+        verticalDebugPanel.update();
         runOutput.appendLine(`WebTest ${params.runId ?? activeRunId ?? ""} cancelled.`);
         activeRunId = undefined;
         activeWebTestRunId = undefined;
@@ -320,18 +320,28 @@ export function activate(context: vscode.ExtensionContext): void {
         runOutput.appendLine(`Starting WebTest: ${selection[0].fsPath}`);
         runOutput.appendLine("");
 
-        // Avvia il processo Host, inizializza JSON-RPC e collega il debugger CLR
-        // prima di inviare webtest.run, così i breakpoint sono già attivi al primo step.
+        // Avvia il processo Host e inizializza JSON-RPC.
         if (!hostManager.isRunning) await hostManager.start();
         if (!communicationClient.isInitialized) await communicationClient.initialize();
-        await hostDebugger.attach();
-        runOutput.appendLine(`C# debugger attached to DeoLoadTest Host (PID ${hostManager.processId}).`);
+
+        // Il debugger è opzionale: un problema di attach non deve impedire il WebTest.
+        // Quando l'attach riesce, i breakpoint sono attivi prima di inviare webtest.run.
+        try {
+          await hostDebugger.attach();
+          runOutput.appendLine(`C# debugger attached to DeoLoadTest Host (PID ${hostManager.processId}).`);
+        } catch (debugError) {
+          const debugMessage = debugError instanceof Error ? debugError.message : String(debugError);
+          runOutput.appendLine(`C# debugger attach failed; continuing without debugger: ${debugMessage}`);
+          void vscode.window.showWarningMessage(
+            `WebTest will run without C# debugging: ${debugMessage}`
+          );
+        }
 
         // Compila i passi C# con Portable PDB per consentire i breakpoint CLR.
         const result = await communicationClient.startWebTest(selection[0].fsPath, true);
         activeRunId = result.runId;
         activeWebTestRunId = result.runId;
-        const testName = selection[0].fsPath.split(/[\\/]/).pop()?.replace(/\.webtest\.(yaml|yml)$/i, "") ?? selection[0].fsPath;
+        const testName = selection[0].fsPath.split(/[\\\\/]/).pop()?.replace(/\\.webtest\\.(yaml|yml)$/i, "") ?? selection[0].fsPath;
         webTestDebugSession.start(result.runId, new Date().toISOString(), testName);
         void vscode.commands.executeCommand("setContext", "deoloadtest.webTestRunning", true);
         requestExplorer.refresh();
@@ -380,7 +390,7 @@ export function activate(context: vscode.ExtensionContext): void {
       webTestDebugSession.clearRequests();
       requestExplorer.refresh();
       debugPanel.update();
-          verticalDebugPanel.update();
+      verticalDebugPanel.update();
     }
   );
 
