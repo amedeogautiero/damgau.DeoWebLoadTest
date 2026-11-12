@@ -255,13 +255,14 @@ internal sealed class StdioJsonRpcServer(TextReader input, TextWriter output, Te
                     if (executionEvent.EventType == "RequestStarted")
                         Interlocked.Increment(ref requestCount);
 
-                    // Diagnostic pass: forward every engine event so the extension can
-                    // reveal the actual event names and payload shape emitted by WebTestRunner.
-                    WriteNotification("webtest.event", new
+                    if (executionEvent.EventType is "RequestCompleted" or "RequestFailed")
                     {
-                        runId = active.RunId,
-                        @event = executionEvent
-                    });
+                        WriteNotification("webtest.event", new
+                        {
+                            runId = active.RunId,
+                            @event = executionEvent
+                        });
+                    }
                 }
             });
 

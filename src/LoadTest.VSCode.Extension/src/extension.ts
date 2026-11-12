@@ -119,10 +119,6 @@ export function activate(context: vscode.ExtensionContext): void {
             }
             webTestFailureDetails.push(details.join("\n"));
           }
-        } else {
-          // Temporary diagnostic output: show the exact event name and payload
-          // emitted by the Host/Runner, including events not yet recognized here.
-          runOutput.appendLine(`WebTest diagnostic event: ${JSON.stringify(params.event ?? params)}`);
         }
         break;
       }
