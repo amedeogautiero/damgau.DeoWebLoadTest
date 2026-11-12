@@ -5,6 +5,7 @@ using LoadTest.Execution;
 using LoadTest.Engine.Runtime;
 using LoadTest.Engine.Model;
 using LoadTest.Sdk;
+using LoadTest.Plugins.Compilation;
 
 namespace LoadTest.VSCode.Host;
 
@@ -38,6 +39,15 @@ internal sealed class StdioJsonRpcServer(TextReader input, TextWriter output, Te
 
         public string WebTestFile { get; set; } = "";
         public bool DebugMode { get; set; }
+    }
+
+    private sealed class ScriptCompileParams
+    {
+        public ScriptCompileParams() { }
+
+        public string SourcePath { get; set; } = "";
+        public string? OutputDirectory { get; set; }
+        public string? AssemblyName { get; set; }
     }
 
     private sealed class CancelRunParams
@@ -136,6 +146,7 @@ internal sealed class StdioJsonRpcServer(TextReader input, TextWriter output, Te
                             progressNotifications = true,
                             executionEvents = true,
                             cancellation = true,
+                            scriptCompilation = true,
                             concurrentRuns = false
                         }
                     });
@@ -170,6 +181,20 @@ internal sealed class StdioJsonRpcServer(TextReader input, TextWriter output, Te
                     var active = ReserveRun();
                     WriteResult(id, new { runId = active.RunId });
                     LaunchWebTest(active, request);
+                    break;
+                }
+
+                case "script.compile":
+                {
+                    var request = parameters.ValueKind == JsonValueKind.Undefined
+                        ? new ScriptCompileParams()
+                        : JsonSerializer.Deserialize<ScriptCompileParams>(parameters.GetRawText(), JsonOptions)
+                            ?? throw new RpcException(-32602, "Invalid params");
+
+                    if (string.IsNullOrWhiteSpace(request.SourcePath))
+                        throw new RpcException(-32602, "sourcePath is required");
+
+                    WriteResult(id, CompileScript(request));
                     break;
                 }
 
@@ -324,6 +349,52 @@ internal sealed class StdioJsonRpcServer(TextReader input, TextWriter output, Te
 
             active.Cancellation.Dispose();
         }
+    }
+
+    private static object CompileScript(ScriptCompileParams request)
+    {
+        var sourcePath = Path.GetFullPath(request.SourcePath);
+        if (!File.Exists(sourcePath))
+            throw new RpcException(-32602, $"Source file not found: {sourcePath}");
+        if (!sourcePath.EndsWith(".csx", StringComparison.OrdinalIgnoreCase))
+            throw new RpcException(-32602, "sourcePath must point to a .csx file");
+
+        var requestedName = string.IsNullOrWhiteSpace(request.AssemblyName)
+            ? Path.GetFileNameWithoutExtension(sourcePath)
+            : request.AssemblyName.Trim();
+        var assemblyName = new string(requestedName
+            .Select(c => char.IsLetterOrDigit(c) || c == '_' ? c : '_').ToArray());
+        if (assemblyName.Length == 0 || char.IsDigit(assemblyName[0]))
+            assemblyName = "_" + assemblyName;
+
+        var outputDirectory = string.IsNullOrWhiteSpace(request.OutputDirectory)
+            ? Path.Combine(Path.GetDirectoryName(sourcePath)!, ".deoloadtest", "compiled")
+            : Path.GetFullPath(request.OutputDirectory);
+        Directory.CreateDirectory(outputDirectory);
+
+        // Il percorso assoluto viene scritto nei Document del Portable PDB:
+        // il debugger può così associare i simboli al file aperto nell'editor.
+        var sources = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            [sourcePath] = File.ReadAllText(sourcePath)
+        };
+        var compiled = ScriptCompiler.CompileWithSymbols(assemblyName, sources);
+
+        var assemblyPath = Path.Combine(outputDirectory, assemblyName + ".dll");
+        var pdbPath = Path.Combine(outputDirectory, assemblyName + ".pdb");
+        File.WriteAllBytes(assemblyPath, compiled.Assembly);
+        File.WriteAllBytes(pdbPath, compiled.Pdb
+            ?? throw new InvalidOperationException("Roslyn non ha prodotto il Portable PDB richiesto."));
+
+        return new
+        {
+            sourcePath,
+            assemblyName,
+            assemblyPath,
+            pdbPath,
+            assemblyBytes = compiled.Assembly.Length,
+            pdbBytes = compiled.Pdb.Length
+        };
     }
 
     private void CancelRun(string runId)
