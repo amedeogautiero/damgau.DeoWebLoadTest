@@ -8,8 +8,6 @@ export class WebTestRequestInspector implements vscode.Disposable {
   private currentRequestId: number | undefined;
   private disposed = false;
 
-  constructor(private readonly extensionUri: vscode.Uri) {}
-
   show(request: DebugRequest): void {
     if (this.disposed) return;
 
@@ -33,6 +31,12 @@ export class WebTestRequestInspector implements vscode.Disposable {
     }
 
     this.currentRequestId = request.id;
+    this.panel.title = this.titleFor(request);
+    this.panel.webview.html = this.render(request);
+  }
+
+  update(request: DebugRequest): void {
+    if (!this.panel || this.currentRequestId !== request.id) return;
     this.panel.title = this.titleFor(request);
     this.panel.webview.html = this.render(request);
   }
