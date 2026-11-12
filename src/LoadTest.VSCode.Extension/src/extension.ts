@@ -3,6 +3,7 @@ import { CommunicationClient, HostNotification } from "./communicationClient";
 import { HostManager } from "./hostManager";
 import { importHarFile } from "./harImporter";
 import { registerWebTestValidator } from "./webTestValidator";
+import { WebTestDebugSession, WebTestExecutionEvent } from "./webTestDebugSession";
 
 interface RunNotificationParams {
   runId?: string;
@@ -23,7 +24,7 @@ interface RunNotificationParams {
     elapsedMs?: number;
     requests?: number;
   };
-  event?: { eventType?: string; requestName?: string; method?: string; url?: string; statusCode?: number; reasonPhrase?: string; success?: boolean; errorType?: string; errorMessage?: string; exceptionDetails?: string; elapsedMicros?: number; requestDefinition?: unknown };
+  event?: WebTestExecutionEvent;
   error?: { code?: string; message?: string; details?: string };
 }
 
@@ -32,7 +33,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const communicationClient = new CommunicationClient(hostManager);
   const runOutput = vscode.window.createOutputChannel("DeoLoadTest Run");
   registerWebTestValidator(context);
-  let activeRunId: string | undefined;
+  let activeRunId: string | undefined;\n  const webTestDebugSession = new WebTestDebugSession();
   let webTestRequestRows: string[] = [];
   let webTestFailureDetails: string[] = [];
   let webTestSuccessfulRequests = 0;
