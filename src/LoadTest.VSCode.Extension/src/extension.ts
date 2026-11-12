@@ -23,7 +23,7 @@ interface RunNotificationParams {
     elapsedMs?: number;
     requests?: number;
   };
-  event?: { eventType?: string; requestName?: string; statusCode?: number; errorMessage?: string };
+  event?: { eventType?: string; requestName?: string; method?: string; url?: string; statusCode?: number; errorType?: string; errorMessage?: string; exceptionDetails?: string; elapsedMicros?: number; requestDefinition?: unknown };
   error?: { code?: string; message?: string; details?: string };
 }
 
@@ -77,9 +77,32 @@ export function activate(context: vscode.ExtensionContext): void {
         activeRunId = undefined;
         void vscode.window.showInformationMessage("DeoLoadTest run cancelled.");
         break;
-      case "webtest.event":
-        runOutput.appendLine(`WebTest event: ${JSON.stringify(params.event ?? {})}`);
+      case "webtest.event": {
+        const event = params.event ?? {};
+        if (event.eventType === "RequestFailed") {
+          runOutput.appendLine("");
+          runOutput.appendLine(`REQUEST FAILED: ${event.requestName ?? "Unnamed request"}`);
+          runOutput.appendLine(`  Method: ${event.method ?? "n/a"}`);
+          runOutput.appendLine(`  URL: ${event.url ?? "n/a"}`);
+          runOutput.appendLine(`  Type: ${event.errorType ?? "n/a"}`);
+          runOutput.appendLine(`  Error: ${event.errorMessage ?? "n/a"}`);
+          if (typeof event.elapsedMicros === "number") {
+            runOutput.appendLine(`  Duration: ${(event.elapsedMicros / 1000).toFixed(1)} ms`);
+          }
+          if (event.exceptionDetails) {
+            runOutput.appendLine("  Exception chain:");
+            for (const line of event.exceptionDetails.split("\\n")) runOutput.appendLine(`    ${line}`);
+          }
+          if (event.requestDefinition !== undefined) {
+            runOutput.appendLine("  YAML request node (parsed):");
+            runOutput.appendLine(JSON.stringify(event.requestDefinition, null, 2)
+              .split("\\n").map(line => `    ${line}`).join("\\n"));
+          }
+        } else if (event.eventType) {
+          runOutput.appendLine(`WebTest event: ${event.eventType} ${event.requestName ?? ""}`);
+        }
         break;
+      }
       case "webtest.completed": {
         const result = params.result ?? {};
         runOutput.appendLine(

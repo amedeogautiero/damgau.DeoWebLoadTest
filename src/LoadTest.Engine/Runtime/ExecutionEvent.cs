@@ -21,6 +21,10 @@ public sealed record ExecutionEvent
     public long? ElapsedMicros { get; init; }
     public string? ErrorType { get; init; }
     public string? ErrorMessage { get; init; }
+    /// <summary>Catena completa delle eccezioni, inclusa l'inner exception.</summary>
+    public string? ExceptionDetails { get; init; }
+    /// <summary>Nodo request originale del passo WebTest, prima del binding delle variabili.</summary>
+    public object? RequestDefinition { get; init; }
     public string? VariableName { get; init; }
     public string? VariableValue { get; init; }
     public bool? Success { get; init; }
