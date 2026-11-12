@@ -7,6 +7,8 @@ export class WebTestDebugPanelVertical implements vscode.Disposable {
   private disposed = false;
   private webviewReady = false;
   private readonly sentRequests = new Map<number, DebugRequest>();
+  private lastSentSelectedRequestId: number | undefined;
+  private lastSentSelectedRequest: DebugRequest | null | undefined;
 
   constructor(
     private readonly session: WebTestDebugSession,
@@ -46,6 +48,8 @@ export class WebTestDebugPanelVertical implements vscode.Disposable {
         this.selectedRequestId = undefined;
         this.webviewReady = false;
         this.sentRequests.clear();
+        this.lastSentSelectedRequestId = undefined;
+        this.lastSentSelectedRequest = undefined;
       });
       this.panel.webview.html = this.renderHtml();
     } else {
@@ -83,6 +87,9 @@ export class WebTestDebugPanelVertical implements vscode.Disposable {
       this.selectedRequestId = requests.length ? requests[requests.length - 1].id : undefined;
     }
     const selectedRequest = requests.find(request => request.id === this.selectedRequestId) ?? null;
+    const selectedChanged = force || this.selectedRequestId !== this.lastSentSelectedRequestId || selectedRequest !== this.lastSentSelectedRequest;
+    this.lastSentSelectedRequestId = this.selectedRequestId;
+    this.lastSentSelectedRequest = selectedRequest;
 
     const succeeded = this.session.successfulRequests;
     const failed = this.session.failedRequests;
