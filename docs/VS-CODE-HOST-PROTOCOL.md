@@ -47,11 +47,12 @@ Parameters:
 - `resultsDatabasePath` (optional): SQLite results database; defaults to `loadtest-results.db` in the host working directory.
 - `runName` (optional): display name for the run.
 - `seed` (optional): deterministic execution seed.
+- `debugMode` (optional, default `false`): enables per-request execution event notifications and request/response payloads.
 
 Request:
 
 ```json
-{"jsonrpc":"2.0","id":2,"method":"run.start","params":{"loadTestFile":"C:/tests/sample.loadtest.yaml","seed":12345}}
+{"jsonrpc":"2.0","id":2,"method":"run.start","params":{"loadTestFile":"C:/tests/sample.loadtest.yaml","seed":12345,"debugMode":true}}
 ```
 
 Response:
@@ -92,7 +93,7 @@ The snapshot contains status, sequence, elapsed time, active users, completed/fa
 
 ### Debug execution notifications
 
-The host forwards structured events raised by the shared engine. Each notification has the common envelope `{ "runId": "...", "event": { ... } }`. Event properties are camelCase.
+These notifications are sent only when `run.start` specifies `debugMode: true`. The host forwards structured events raised by the shared engine. Each notification has the common envelope `{ "runId": "...", "event": { ... } }`. Event properties are camelCase.
 
 - `debug.requestStarted`: emitted after request plugins and variable binding, immediately before the HTTP send. Includes scenario, test, virtual user, iteration, request name, method, final URL, headers, and request body.
 - `debug.requestCompleted`: emitted after a successful HTTP request and its validations/extractions. Includes request and response metadata, response headers/body, status, and elapsed microseconds.
