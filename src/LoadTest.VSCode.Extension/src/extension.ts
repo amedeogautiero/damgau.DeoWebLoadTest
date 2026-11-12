@@ -91,12 +91,12 @@ export function activate(context: vscode.ExtensionContext): void {
           }
           if (event.exceptionDetails) {
             runOutput.appendLine("  Exception chain:");
-            for (const line of event.exceptionDetails.split("\\n")) runOutput.appendLine(`    ${line}`);
+            for (const line of event.exceptionDetails.split("\n")) runOutput.appendLine(`    ${line}`);
           }
           if (event.requestDefinition !== undefined) {
             runOutput.appendLine("  YAML request node (parsed):");
             runOutput.appendLine(JSON.stringify(event.requestDefinition, null, 2)
-              .split("\\n").map(line => `    ${line}`).join("\\n"));
+              .split("\n").map(line => `    ${line}`).join("\n"));
           }
         } else if (event.eventType) {
           runOutput.appendLine(`WebTest event: ${event.eventType} ${event.requestName ?? ""}`);
