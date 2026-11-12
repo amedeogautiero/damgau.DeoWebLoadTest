@@ -5,6 +5,7 @@ using Google.Protobuf;
 using Google.Protobuf.WellKnownTypes;
 using LoadTest.Agent;
 using LoadTest.Agent.Transfer;
+using LoadTest.Metrics;
 using LoadTest.Engine.LoadTesting;
 using LoadTest.Plugins;
 using LoadTest.Protocol;

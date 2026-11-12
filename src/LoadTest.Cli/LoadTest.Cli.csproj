@@ -23,6 +23,7 @@
     <ProjectReference Include="..\LoadTest.Agent\LoadTest.Agent.csproj" />
     <ProjectReference Include="..\LoadTest.Controller\LoadTest.Controller.csproj" />
     <ProjectReference Include="..\LoadTest.Engine\LoadTest.Engine.csproj" />
+    <ProjectReference Include="..\LoadTest.Execution\LoadTest.Execution.csproj" />
     <ProjectReference Include="..\LoadTest.Metrics\LoadTest.Metrics.csproj" />
     <ProjectReference Include="..\LoadTest.Plugins\LoadTest.Plugins.csproj" />
     <ProjectReference Include="..\LoadTest.Reports\LoadTest.Reports.csproj" />

@@ -3,6 +3,7 @@ using Google.Protobuf.WellKnownTypes;
 using LoadTest.Agent.Transfer;
 using LoadTest.Engine.LoadTesting;
 using LoadTest.Engine.Runtime;
+using LoadTest.Metrics;
 using LoadTest.Plugins;
 using LoadTest.Protocol;
 using Microsoft.Extensions.Logging;

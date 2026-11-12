@@ -25,6 +25,7 @@
     <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.0" />
     <PackageReference Include="Grpc.Net.Client" Version="2.71.0" />
     <ProjectReference Include="..\LoadTest.Engine\LoadTest.Engine.csproj" />
+    <ProjectReference Include="..\LoadTest.Metrics\LoadTest.Metrics.csproj" />
     <ProjectReference Include="..\LoadTest.Plugins\LoadTest.Plugins.csproj" />
     <ProjectReference Include="..\LoadTest.Protocol\LoadTest.Protocol.csproj" />
   </ItemGroup>

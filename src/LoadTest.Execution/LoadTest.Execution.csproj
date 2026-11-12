@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>LoadTest.Execution</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\LoadTest.Contracts\LoadTest.Contracts.csproj" />
+    <ProjectReference Include="..\LoadTest.Engine\LoadTest.Engine.csproj" />
+    <ProjectReference Include="..\LoadTest.Metrics\LoadTest.Metrics.csproj" />
+    <ProjectReference Include="..\LoadTest.Plugins\LoadTest.Plugins.csproj" />
+    <ProjectReference Include="..\LoadTest.Reports\LoadTest.Reports.csproj" />
+  </ItemGroup>
+</Project>
