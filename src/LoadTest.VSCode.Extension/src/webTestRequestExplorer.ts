@@ -78,7 +78,7 @@ export class WebTestRequestExplorer implements vscode.TreeDataProvider<DebugRequ
   }
 
   private escape(value: string): string {
-    return value.replace(/[\\\\`*_{}[\]()#+.!|>~-]/g, "\\\\$&");
+    return value.replace(/[\\`*_{}\[\]()#+.!|>~-]/g, "\\$&");
   }
 
   dispose(): void {
