@@ -124,7 +124,7 @@ export function activate(context: vscode.ExtensionContext): void {
           requestInspector.update(webTestDebugSession.requests);
           timingInspector.update(webTestDebugSession.requests, webTestDebugSession.status);
           debugPanel.update();
-          verticalDebugPanel.update();
+          verticalDebugPanel.update(latestRequest?.id);
         }
         if (event.eventType === "RequestCompleted" || event.eventType === "RequestFailed") {
           const success = event.eventType === "RequestCompleted";
