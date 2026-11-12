@@ -133,7 +133,7 @@ function toWebTestYaml(name: string, entries: HarEntry[]): string {
   });
 
   const lines = [
-    "version: 1.0",
+    "version: 1",
     `name: ${yamlString(name)}`,
     "steps:"
   ];
