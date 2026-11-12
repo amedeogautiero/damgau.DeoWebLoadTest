@@ -438,7 +438,9 @@ export function activate(context: vscode.ExtensionContext): void {
       }
 
       try {
-        await editor.document.save();
+        if (!(await editor.document.save())) {
+          throw new Error("Unable to save the active .csx file before compilation.");
+        }
         runOutput.show(true);
         runOutput.appendLine(`Compiling C# script: ${sourcePath}`);
         const result = await communicationClient.compileScript(sourcePath);
