@@ -82,10 +82,12 @@ export class WebTestDebugPanelVertical implements vscode.Disposable {
 
     const changedRequests: Array<{ slot: number; request: DebugRequest }> = [];
     if (force) {
+      this.resetDurationStats();
       for (let index = 0; index < requests.length; index++) {
         const request = requests[index];
         changedRequests.push({ slot: index + 1, request });
         this.sentRequests.set(request.id, request);
+        this.recordDuration(request);
       }
     } else if (changedRequestId !== undefined) {
       const requestIndex = requests[requests.length - 1]?.id === changedRequestId
@@ -95,6 +97,7 @@ export class WebTestDebugPanelVertical implements vscode.Disposable {
       if (request && this.sentRequests.get(request.id) !== request) {
         changedRequests.push({ slot: requestIndex + 1, request });
         this.sentRequests.set(request.id, request);
+        this.recordDuration(request);
       }
     }
 
@@ -113,8 +116,7 @@ export class WebTestDebugPanelVertical implements vscode.Disposable {
     const succeeded = this.session.successfulRequests;
     const failed = this.session.failedRequests;
     const completed = succeeded + failed;
-    const durations = this.session.requestDurationsMs;
-    const sum = durations.reduce((total, value) => total + value, 0);
+    const durationCount = this.durationValues.size;
     const start = this.parseTime(this.session.startedAt);
     const end = this.parseTime(this.session.finishedAt) ?? Date.now();
     const elapsedMs = start === undefined ? 0 : Math.max(0, end - start);
@@ -133,9 +135,9 @@ export class WebTestDebugPanelVertical implements vscode.Disposable {
       successRate: completed ? succeeded / completed * 100 : 0,
       elapsedMs,
       requestsPerSecond: elapsedMs > 0 ? completed / (elapsedMs / 1000) : 0,
-      averageMs: durations.length ? sum / durations.length : null,
-      minMs: durations.length ? Math.min(...durations) : null,
-      maxMs: durations.length ? Math.max(...durations) : null,
+      averageMs: durationCount ? this.durationSumMs / durationCount : null,
+      minMs: durationCount ? this.durationMinMs : null,
+      maxMs: durationCount ? this.durationMaxMs : null,
       failures: this.session.summary?.failures ?? [],
       requests: changedRequests,
       resetRequests,
