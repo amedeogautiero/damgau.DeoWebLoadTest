@@ -1,6 +1,8 @@
 import * as vscode from "vscode";
 import { DebugRequest, WebTestDebugSession } from "./webTestDebugSession";
 
+const TIMELINE_WIDTH = 16;
+
 export class WebTestRequestExplorer implements vscode.TreeDataProvider<DebugRequest> {
   private readonly changed = new vscode.EventEmitter<DebugRequest | undefined | void>();
   readonly onDidChangeTreeData = this.changed.event;
@@ -13,7 +15,7 @@ export class WebTestRequestExplorer implements vscode.TreeDataProvider<DebugRequ
 
   getTreeItem(request: DebugRequest): vscode.TreeItem {
     const method = (request.method ?? "???").toUpperCase();
-    const label = `#${String(request.id).padStart(3, "0")}  ${method}  ${this.shortUrl(request.url)}`;
+    const label = `#${String(request.id).padStart(3, "0")}  ${method}  ${this.shortUrl(request.url)}  │ ${this.timelineFor(request)}`;
     const item = new vscode.TreeItem(label, vscode.TreeItemCollapsibleState.None);
     item.id = `deoloadtest.request.${request.id}`;
     item.contextValue = "deoloadtest.request";
@@ -52,19 +54,63 @@ export class WebTestRequestExplorer implements vscode.TreeDataProvider<DebugRequ
 
   private tooltipFor(request: DebugRequest): vscode.MarkdownString {
     const tooltip = new vscode.MarkdownString(undefined, true);
-    tooltip.appendMarkdown(`**Request #${request.id}**  \n\n`);
-    tooltip.appendMarkdown(`**Status:** ${request.status}  \n\n`);
-    if (request.method) tooltip.appendMarkdown(`**Method:** ${this.escape(request.method)}  \n\n`);
-    if (request.url) tooltip.appendMarkdown(`**URL:** ${this.escape(request.url)}  \n\n`);
+    tooltip.appendMarkdown(`**Request #${request.id}**  \\n\\n`);
+    tooltip.appendMarkdown(`**Status:** ${request.status}  \\n\\n`);
+    if (request.method) tooltip.appendMarkdown(`**Method:** ${this.escape(request.method)}  \\n\\n`);
+    if (request.url) tooltip.appendMarkdown(`**URL:** ${this.escape(request.url)}  \\n\\n`);
+    const offset = this.startOffsetMs(request);
+    if (offset !== undefined) tooltip.appendMarkdown(`**Start offset:** ${offset.toFixed(2)} ms  \\n\\n`);
     if (typeof request.statusCode === "number") {
-      tooltip.appendMarkdown(`**Response:** ${request.statusCode} ${this.escape(request.reasonPhrase ?? "")}  \n\n`);
+      tooltip.appendMarkdown(`**Response:** ${request.statusCode} ${this.escape(request.reasonPhrase ?? "")}  \\n\\n`);
     }
     if (typeof request.elapsedMicros === "number") {
-      tooltip.appendMarkdown(`**Duration:** ${(request.elapsedMicros / 1000).toFixed(2)} ms  \n\n`);
+      tooltip.appendMarkdown(`**Duration:** ${(request.elapsedMicros / 1000).toFixed(2)} ms  \\n\\n`);
     }
-    if (request.errorMessage) tooltip.appendMarkdown(`**Error:** ${this.escape(request.errorMessage)}  \n\n`);
+    if (request.errorMessage) tooltip.appendMarkdown(`**Error:** ${this.escape(request.errorMessage)}  \\n\\n`);
     tooltip.isTrusted = false;
     return tooltip;
+  }
+
+  private timelineFor(request: DebugRequest): string {
+    const requests = this.session.requests;
+    const firstStart = this.firstStart(requests);
+    const start = this.parseTime(request.startedAt);
+    if (firstStart === undefined || start === undefined) return "·".repeat(TIMELINE_WIDTH);
+
+    const maxEnd = requests.reduce((max, item) => {
+      const itemStart = this.parseTime(item.startedAt);
+      if (itemStart === undefined) return max;
+      const offset = Math.max(0, itemStart - firstStart);
+      const duration = typeof item.elapsedMicros === "number"
+        ? item.elapsedMicros / 1000
+        : item.status === "pending" ? Math.max(0, Date.now() - itemStart) : 0;
+      return Math.max(max, offset + duration);
+    }, 1);
+    const offset = Math.max(0, start - firstStart);
+    const duration = typeof request.elapsedMicros === "number"
+      ? request.elapsedMicros / 1000
+      : request.status === "pending" ? Math.max(1, Date.now() - start) : 1;
+    const left = Math.min(TIMELINE_WIDTH - 1, Math.floor(offset / maxEnd * TIMELINE_WIDTH));
+    const width = Math.max(1, Math.min(TIMELINE_WIDTH - left, Math.ceil(duration / maxEnd * TIMELINE_WIDTH)));
+    return "·".repeat(left) + "━".repeat(width) + "·".repeat(TIMELINE_WIDTH - left - width);
+  }
+
+  private startOffsetMs(request: DebugRequest): number | undefined {
+    const firstStart = this.firstStart(this.session.requests);
+    const start = this.parseTime(request.startedAt);
+    return firstStart === undefined || start === undefined ? undefined : Math.max(0, start - firstStart);
+  }
+
+  private firstStart(requests: readonly DebugRequest[]): number | undefined {
+    return requests.map(request => this.parseTime(request.startedAt))
+      .filter((value): value is number => value !== undefined)
+      .reduce<number | undefined>((min, value) => min === undefined || value < min ? value : min, undefined);
+  }
+
+  private parseTime(value?: string): number | undefined {
+    if (!value) return undefined;
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
   }
 
   private shortUrl(value?: string): string {
@@ -78,7 +124,7 @@ export class WebTestRequestExplorer implements vscode.TreeDataProvider<DebugRequ
   }
 
   private escape(value: string): string {
-    return value.replace(/[\\`*_{}\[\]()#+.!|>~-]/g, "\\$&");
+    return value.replace(/[\\\\`*_{}\\[\\]()#+.!|>~-]/g, "\\\\$&");
   }
 
   dispose(): void {
