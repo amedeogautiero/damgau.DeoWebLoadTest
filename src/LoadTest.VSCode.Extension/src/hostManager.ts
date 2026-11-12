@@ -5,6 +5,7 @@ import * as vscode from "vscode";
 
 const HOST_START_TIMEOUT_MS = 30000;
 const HOST_STOP_TIMEOUT_MS = 5000;
+const HOST_TARGET_FRAMEWORK = "net10.0";
 
 export class HostManager implements vscode.Disposable {
   private process: ChildProcess | undefined;
@@ -25,31 +26,46 @@ export class HostManager implements vscode.Disposable {
       return;
     }
 
-    const projectPath = path.resolve(
+    const hostProjectDirectory = path.resolve(
       this.extensionPath,
       "..",
-      "LoadTest.VSCode.Host",
-      "LoadTest.VSCode.Host.csproj"
+      "LoadTest.VSCode.Host"
     );
 
-    if (!fs.existsSync(projectPath)) {
+    const executableName = process.platform === "win32"
+      ? "LoadTest.VSCode.Host.exe"
+      : "LoadTest.VSCode.Host";
+
+    // Prefer Debug for the Extension Development Host, but also support a
+    // previously compiled Release build. Starting the Host must never build it.
+    const outputDirectories = ["Debug", "Release"].map(configuration =>
+      path.join(hostProjectDirectory, "bin", configuration, HOST_TARGET_FRAMEWORK)
+    );
+    const hostOutputDirectory = outputDirectories.find(directory =>
+      fs.existsSync(path.join(directory, executableName))
+    );
+
+    if (!hostOutputDirectory) {
+      const expectedPaths = outputDirectories
+        .map(directory => path.join(directory, executableName))
+        .join(" or ");
+
       throw new Error(
-        `Host project not found: ${projectPath}. This development version expects the repository source layout.`
+        `Compiled DeoLoadTest Host executable not found. Build LoadTest.VSCode.Host first. Expected: ${expectedPaths}`
       );
     }
 
-    this.output.show(true);
-    this.output.appendLine("Starting DeoLoadTest Host...");
+    const hostExecutable = path.join(hostOutputDirectory, executableName);
 
-    const child = spawn(
-      "dotnet",
-      ["run", "--project", projectPath, "--no-launch-profile"],
-      {
-        cwd: path.dirname(projectPath),
-        stdio: ["pipe", "pipe", "pipe"],
-        windowsHide: true
-      }
-    );
+    this.output.show(true);
+    this.output.appendLine("Starting compiled DeoLoadTest Host...");
+    this.output.appendLine(`Executable: ${hostExecutable}`);
+
+    const child = spawn(hostExecutable, [], {
+      cwd: hostOutputDirectory,
+      stdio: ["pipe", "pipe", "pipe"],
+      windowsHide: true
+    });
 
     this.process = child;
 
@@ -81,7 +97,7 @@ export class HostManager implements vscode.Disposable {
 
       stdoutBuffer += chunk;
       while (true) {
-        const newlineIndex = stdoutBuffer.indexOf("\n");
+        const newlineIndex = stdoutBuffer.indexOf("\\n");
         if (newlineIndex < 0) break;
 
         const line = stdoutBuffer.slice(0, newlineIndex).trim();
@@ -143,7 +159,7 @@ export class HostManager implements vscode.Disposable {
       throw new Error("DeoLoadTest Host is not running or its input stream is unavailable.");
     }
 
-    child.stdin.write(`${JSON.stringify(message)}\n`);
+    child.stdin.write(`${JSON.stringify(message)}\\n`);
   }
 
   onStdout(listener: (chunk: string) => void): vscode.Disposable {
