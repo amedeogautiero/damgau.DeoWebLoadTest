@@ -87,3 +87,9 @@ Ordine effettivo di sviluppo
 | 9 | Debugger .NET | Debug Code e plugin Roslyn |
 | 10 | Package Builder | Generazione `.webtestpkg` |
 | 11 | Distribuzione VSIX | Estensione pronta all'utilizzo |
+
+
+
+
+-----------------
+Una precisazione: responseTimeGoal è citata nel contratto, ma non è ancora implementata. Non l'ho quindi inserita tra le regole disponibili nello schema. (per intellisense dello yaml di un webtest)

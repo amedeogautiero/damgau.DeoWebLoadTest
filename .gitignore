@@ -399,3 +399,6 @@ FodyWeavers.xsd
 /GitHubApiKey.txt
 # VS Code extension generated output
 /src/LoadTest.VSCode.Extension/out/
+
+/src/LoadTest.VSCode.Extension/out/
+/examples/WebTests/results/
