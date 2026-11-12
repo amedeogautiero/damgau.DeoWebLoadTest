@@ -1,10 +1,74 @@
 import * as vscode from "vscode";
-import { CommunicationClient } from "./communicationClient";
+import { CommunicationClient, HostNotification } from "./communicationClient";
 import { HostManager } from "./hostManager";
+
+interface RunNotificationParams {
+  runId?: string;
+  snapshot?: {
+    status?: string;
+    elapsed?: unknown;
+    activeUsers?: number;
+    completedTests?: number;
+    failedTests?: number;
+    completedRequests?: number;
+    failedRequests?: number;
+  };
+  result?: {
+    run?: { status?: string };
+    summary?: unknown;
+  };
+  error?: { code?: string; message?: string; details?: string };
+}
 
 export function activate(context: vscode.ExtensionContext): void {
   const hostManager = new HostManager(context.extensionUri.fsPath);
   const communicationClient = new CommunicationClient(hostManager);
+  const runOutput = vscode.window.createOutputChannel("DeoLoadTest Run");
+  let activeRunId: string | undefined;
+
+  const notificationSubscription = communicationClient.onNotification((notification) => {
+    if (!notification.method.startsWith("run.")) return;
+
+    const params = (notification.params ?? {}) as RunNotificationParams;
+    if (params.runId && activeRunId && params.runId !== activeRunId) return;
+
+    switch (notification.method) {
+      case "run.progress": {
+        const snapshot = params.snapshot ?? {};
+        runOutput.appendLine(
+          `Progress: status=${snapshot.status ?? "unknown"}, elapsed=${String(snapshot.elapsed ?? "n/a")}, activeUsers=${snapshot.activeUsers ?? "n/a"}, tests=${snapshot.completedTests ?? "n/a"} completed/${snapshot.failedTests ?? 0} failed, requests=${snapshot.completedRequests ?? "n/a"} completed/${snapshot.failedRequests ?? 0} failed.`
+        );
+        break;
+      }
+      case "run.completed":
+        runOutput.appendLine(
+          `Run ${params.runId ?? activeRunId ?? ""} completed. Engine status: ${params.result?.run?.status ?? "unknown"}.`
+        );
+        if (params.result?.summary) {
+          runOutput.appendLine(`Summary: ${JSON.stringify(params.result.summary)}`);
+        }
+        activeRunId = undefined;
+        void vscode.window.showInformationMessage("DeoLoadTest run completed.");
+        break;
+      case "run.failed":
+        runOutput.appendLine(
+          `Run failed: ${params.error?.message ?? "Unknown execution error"}`
+        );
+        if (params.error?.details) runOutput.appendLine(params.error.details);
+        activeRunId = undefined;
+        void vscode.window.showErrorMessage(
+          `DeoLoadTest run failed: ${params.error?.message ?? "Unknown error"}`
+        );
+        break;
+      case "run.cancelled":
+        runOutput.appendLine(`Run ${params.runId ?? activeRunId ?? ""} cancelled.`);
+        activeRunId = undefined;
+        void vscode.window.showInformationMessage("DeoLoadTest run cancelled.");
+        break;
+      default:
+        runOutput.appendLine(`Host notification: ${notification.method}`);
+    }
+  });
 
   const showWelcomeCommand = vscode.commands.registerCommand(
     "deoloadtest.showWelcome",
@@ -29,6 +93,38 @@ export function activate(context: vscode.ExtensionContext): void {
     }
   );
 
+  const runLoadTestCommand = vscode.commands.registerCommand(
+    "deoloadtest.runLoadTest",
+    async () => {
+      const selection = await vscode.window.showOpenDialog({
+        canSelectMany: false,
+        openLabel: "Run Load Test",
+        filters: {
+          "DeoLoadTest files": ["loadtest.yaml", "yaml", "yml"]
+        }
+      });
+      if (!selection?.length) return;
+
+      try {
+        await hostManager.start();
+        await communicationClient.initialize();
+
+        runOutput.clear();
+        runOutput.show(true);
+        runOutput.appendLine(`Starting load test: ${selection[0].fsPath}`);
+
+        const result = await communicationClient.startRun(selection[0].fsPath);
+        activeRunId = result.runId;
+        runOutput.appendLine(`Run accepted. Run ID: ${result.runId}`);
+        void vscode.window.showInformationMessage("DeoLoadTest run started.");
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        runOutput.appendLine(`Unable to start load test: ${message}`);
+        void vscode.window.showErrorMessage(`Unable to start DeoLoadTest run: ${message}`);
+      }
+    }
+  );
+
   const stopHostCommand = vscode.commands.registerCommand(
     "deoloadtest.stopHost",
     () => hostManager.stop()
@@ -37,9 +133,12 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     showWelcomeCommand,
     startHostCommand,
+    runLoadTestCommand,
     stopHostCommand,
+    notificationSubscription,
     communicationClient,
-    hostManager
+    hostManager,
+    runOutput
   );
 }
 
