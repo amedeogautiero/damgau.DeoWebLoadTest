@@ -36,19 +36,12 @@
         "title": "DeoLoadTest: Run Load Test"
       }
     ],
-    "languages": [
+    "yamlValidation": [
       {
-        "id": "yaml",
-        "extensions": [
-          ".webtest.yaml"
-        ]
+        "fileMatch": "*.webtest.yaml",
+        "url": "./schemas/webtest.schema.json"
       }
-    ],
-    "yamlSchemas": {
-      "./schemas/webtest.schema.json": [
-        "*.webtest.yaml"
-      ]
-    }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
@@ -59,5 +52,8 @@
     "@types/node": "^20.17.0",
     "@types/vscode": "^1.90.0",
     "typescript": "^5.7.2"
-  }
+  },
+  "extensionDependencies": [
+    "redhat.vscode-yaml"
+  ]
 }
