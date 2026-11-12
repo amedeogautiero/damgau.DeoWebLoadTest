@@ -195,7 +195,7 @@ export function activate(context: vscode.ExtensionContext): void {
         runOutput.show(true);
         runOutput.appendLine(`Starting WebTest: ${selection[0].fsPath}`);
 
-        const result = await communicationClient.startWebTest(selection[0].fsPath, true);
+        const result = await communicationClient.startWebTest(selection[0].fsPath);
         activeRunId = result.runId;
         runOutput.appendLine(`WebTest accepted. Run ID: ${result.runId}`);
       } catch (error) {
