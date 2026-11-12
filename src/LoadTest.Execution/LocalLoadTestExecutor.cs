@@ -106,7 +106,15 @@ public static class LocalLoadTestExecutor
 
             var runnerOptions = new LoadTestRunnerOptions
             {
-                Services = new EngineServices { Http = new UnusedHttpExecutor() },
+                Services = new EngineServices
+                {
+                    Http = new UnusedHttpExecutor(),
+                    OnExecutionEvent = executionEvent =>
+                    {
+                        try { options.OnExecutionEvent?.Invoke(executionEvent); }
+                        catch (Exception ex) { NotifyObserverError(ex); }
+                    }
+                },
                 HttpFactory = options.HttpFactory,
                 BaseDirectory = baseDir,
                 Plugins = loadPlugins,
@@ -199,6 +207,7 @@ public sealed class LocalLoadTestOptions
     public string? RunId { get; init; }
     public Func<IHttpExecutor> HttpFactory { get; init; } = () => new HttpClientExecutor();
     public Action<RunProgressSnapshot>? OnProgress { get; init; }
+    public Action<ExecutionEvent>? OnExecutionEvent { get; init; }
     public Action<IntervalSnapshot>? OnInterval { get; init; }
     public Action<Exception>? OnObserverError { get; init; }
 }
