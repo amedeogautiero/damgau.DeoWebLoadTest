@@ -60,10 +60,12 @@ public sealed class PluginWiring
         };
     }
 
-    public EngineServices CreateServices(IHttpExecutor http, ValidationLevel level = ValidationLevel.High) => new()
+    public EngineServices CreateServices(IHttpExecutor http, ValidationLevel level = ValidationLevel.High,
+        Action<ExecutionEvent>? onExecutionEvent = null) => new()
     {
         Http = http, WebTestPlugins = WebTestPlugins, RequestPlugins = RequestPlugins,
-        Rules = Rules, CodeSteps = CodeSteps, ValidationLevel = level
+        Rules = Rules, CodeSteps = CodeSteps, ValidationLevel = level,
+        OnExecutionEvent = onExecutionEvent
     };
 
     private static IEnumerable<PluginRef> Distinct(IEnumerable<PluginRef> refs) =>
