@@ -48,6 +48,12 @@ function rangeForNode(document: vscode.TextDocument, node: Node | null): vscode.
   return new vscode.Range(start, end);
 }
 
+function rangeForYamlError(document: vscode.TextDocument, error: { pos: [number, number] }): vscode.Range {
+  const start = document.positionAt(error.pos[0]);
+  const end = document.positionAt(Math.max(error.pos[0] + 1, error.pos[1]));
+  return new vscode.Range(start, end);
+}
+
 function validateDocument(document: vscode.TextDocument): void {
   if (!document.fileName.endsWith(".webtest.yaml") &&
       !document.fileName.endsWith(".webtest.yml")) return;
@@ -57,7 +63,7 @@ function validateDocument(document: vscode.TextDocument): void {
 
   for (const error of yamlDocument.errors) {
     const diagnostic = new vscode.Diagnostic(
-      rangeForNode(document, error),
+      rangeForYamlError(document, error),
       error.message,
       vscode.DiagnosticSeverity.Error
     );
