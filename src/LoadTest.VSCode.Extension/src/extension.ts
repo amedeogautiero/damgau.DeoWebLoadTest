@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { CommunicationClient, HostNotification } from "./communicationClient";
 import { HostManager } from "./hostManager";
 import { importHarFile } from "./harImporter";
+import { registerWebTestValidator } from "./webTestValidator";
 
 interface RunNotificationParams {
   runId?: string;
@@ -25,6 +26,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const hostManager = new HostManager(context.extensionUri.fsPath);
   const communicationClient = new CommunicationClient(hostManager);
   const runOutput = vscode.window.createOutputChannel("DeoLoadTest Run");
+  registerWebTestValidator(context);
   let activeRunId: string | undefined;
 
   const notificationSubscription = communicationClient.onNotification((notification) => {
