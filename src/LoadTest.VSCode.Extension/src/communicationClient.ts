@@ -71,7 +71,7 @@ export class CommunicationClient implements vscode.Disposable {
     this.buffer += chunk;
 
     while (true) {
-      const newlineIndex = this.buffer.indexOf("\\n");
+      const newlineIndex = this.buffer.indexOf("\n");
       if (newlineIndex < 0) break;
 
       const line = this.buffer.slice(0, newlineIndex).trim();
