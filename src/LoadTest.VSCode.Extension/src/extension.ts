@@ -49,7 +49,9 @@ export function activate(context: vscode.ExtensionContext): void {
     webTestDebugSession,
     () => { void vscode.commands.executeCommand("deoloadtest.runWebTest"); },
     () => { void vscode.commands.executeCommand("deoloadtest.stopWebTest"); },
-    () => { void vscode.commands.executeCommand("deoloadtest.clearRequestExplorer"); }
+    () => { void vscode.commands.executeCommand("deoloadtest.clearRequestExplorer"); },
+    () => { void vscode.commands.executeCommand("deoloadtest.startHost"); },
+    () => { void vscode.commands.executeCommand("deoloadtest.stopHost"); }
   );
   const verticalDebugPanel = new WebTestDebugPanelVertical(
     webTestDebugSession,
@@ -384,6 +386,10 @@ export function activate(context: vscode.ExtensionContext): void {
     () => debugPanel.show()
   );
 
+  const showVerticalDebugPanelCommand = vscode.commands.registerCommand(
+    "deoloadtest.showVerticalDebugPanel",
+    () => verticalDebugPanel.show()
+  );
 
   const showTimingInspectorCommand = vscode.commands.registerCommand(
     "deoloadtest.showTimingInspector",
@@ -435,6 +441,7 @@ export function activate(context: vscode.ExtensionContext): void {
     debugPanel,
     verticalDebugPanel,
     showDebugPanelCommand,
+    showVerticalDebugPanelCommand,
     showTimingInspectorCommand,
     clearRequestExplorerCommand,
     focusRequestExplorerCommand,
