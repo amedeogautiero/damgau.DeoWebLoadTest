@@ -21,7 +21,7 @@ public sealed class PluginCatalog
         if (!_byName.TryAdd(pkg.Manifest.Name, pkg)) throw new PluginLoadException($"plugin duplicato: '{pkg.Manifest.Name}'");
     }
 
-    /// <param name="compileScript">Solo controller: compila i pacchetti .csx (ScriptPackageCompiler.Compile). Senza, un .csx è un errore.</param>
+    /// <param name="compileScript">Compila i pacchetti .csx nel processo che prepara l'esecuzione (Controller o VS Code Host). Senza, un .csx è un errore.</param>
     public static PluginCatalog FromDirectory(string root, Func<PluginPackage, PluginPackage>? compileScript = null)
     {
         var c = new PluginCatalog();
