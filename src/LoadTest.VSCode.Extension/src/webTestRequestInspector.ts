@@ -64,8 +64,7 @@ export class WebTestRequestInspector implements vscode.Disposable {
     const responseHeaders = this.formatValue(request.responseHeaders);
     const responseBody = this.formatValue(request.responseBody);
     const definition = this.formatValue(request.requestDefinition);
-    const contextAtStart = this.renderContext(request.contextAtStart, "Context at request start");
-    const contextAtEnd = this.renderContext(request.contextAtEnd, "Context after request");
+    const requestContext = this.renderRequestContext(request.contextAtStart, request.contextAtEnd);
     const startOffset = this.startOffsetMs(request, requests);
     const duration = typeof request.elapsedMicros === "number"
       ? `${(request.elapsedMicros / 1000).toFixed(2)} ms`
@@ -94,6 +93,10 @@ export class WebTestRequestInspector implements vscode.Disposable {
     .empty { color: var(--vscode-descriptionForeground); font-style: italic; }
     .warning { color: var(--vscode-editorWarning-foreground); }
     .context-snapshot { border: 1px solid var(--vscode-panel-border); border-radius: 4px; padding: 10px 12px; margin: 12px 0; }
+    .context-table th:nth-child(2), .context-table td:nth-child(2), .context-table th:nth-child(3), .context-table td:nth-child(3) { width: 35%; }
+    .change-added { color: var(--vscode-testing-iconPassed); }
+    .change-modified { color: var(--vscode-editorWarning-foreground); }
+    .change-removed { color: var(--vscode-testing-iconFailed); }
     h3 { font-size: .98em; margin: 16px 0 6px; }
     table { width: 100%; border-collapse: collapse; table-layout: fixed; }
     th, td { text-align: left; vertical-align: top; padding: 6px 8px; border-bottom: 1px solid var(--vscode-panel-border); overflow-wrap: anywhere; }
@@ -134,30 +137,65 @@ export class WebTestRequestInspector implements vscode.Disposable {
   ${this.section("Original YAML request node (parsed)", definition)}
 
   <h2>Request Context</h2>
-  ${contextAtStart}
-  ${contextAtEnd}
+  ${requestContext}
 </body>
 </html>`;
   }
 
-  private renderContext(context: WebTestContextSnapshot | undefined, title: string): string {
-    if (!context) return `<div class="field"><span class="label">${this.escapeHtml(title)}:</span><span class="empty">Not available</span></div>`;
-    const renderRecord = (name: string, record?: Record<string, unknown>): string => {
-      const entries = Object.entries(record ?? {});
-      if (entries.length === 0) return `<div class="field"><span class="label">${this.escapeHtml(name)}:</span><span class="empty">No values</span></div>`;
-      const rows = entries.map(([key, value]) =>
-        `<tr><td>${this.escapeHtml(key)}</td><td><pre>${this.escapeHtml(this.formatValue(value).text)}</pre></td></tr>`
-      ).join("");
-      return `<h3>${this.escapeHtml(name)}</h3><table><thead><tr><th>Name</th><th>Value</th></tr></thead><tbody>${rows}</tbody></table>`;
+  private renderRequestContext(before?: WebTestContextSnapshot, after?: WebTestContextSnapshot): string {
+    if (!before && !after) {
+      return '<div class="field empty">Context snapshot not available for this request.</div>';
+    }
+
+    const formatCell = (value: unknown): string => {
+      if (value === undefined) return '<span class="empty">—</span>';
+      const formatted = this.formatValue(value);
+      return formatted.text
+        ? `<pre>${this.escapeHtml(formatted.text)}${formatted.truncated ? "\\n\\n[Display truncated at 64 KB]" : ""}</pre>`
+        : '<span class="empty">(empty)</span>';
     };
-    const rows = Object.entries(context.dataRows ?? {}).map(([table, values]) =>
-      `<h3>Data Row: ${this.escapeHtml(table)}</h3>${renderRecord("Values", values)}`
-    ).join("");
-    return `<div class="context-snapshot"><h3>${this.escapeHtml(title)}</h3>
-      ${renderRecord("Variables", context.variables)}
-      ${rows || '<div class="field empty">No data rows</div>'}
-      ${renderRecord("Predefined values", context.predefined)}
-      ${renderRecord("User / execution context", context.user)}
+
+    const renderChanges = (
+      title: string,
+      oldValues: Record<string, unknown> | undefined,
+      newValues: Record<string, unknown> | undefined
+    ): string => {
+      const oldMap = oldValues ?? {};
+      const newMap = newValues ?? {};
+      const keys = [...new Set([...Object.keys(oldMap), ...Object.keys(newMap)])].sort((a, b) => a.localeCompare(b));
+      if (keys.length === 0) {
+        return `<h3>${this.escapeHtml(title)}</h3><div class="field empty">No values</div>`;
+      }
+
+      const rows = keys.map(key => {
+        const hasOld = Object.prototype.hasOwnProperty.call(oldMap, key);
+        const hasNew = Object.prototype.hasOwnProperty.call(newMap, key);
+        const oldValue = hasOld ? this.formatValue(oldMap[key]).text : undefined;
+        const newValue = hasNew ? this.formatValue(newMap[key]).text : undefined;
+        const changed = !hasOld || !hasNew || oldValue !== newValue;
+        const state = !hasOld ? "Added" : !hasNew ? "Removed" : changed ? "Modified" : "Unchanged";
+        const css = !hasOld ? "change-added" : !hasNew ? "change-removed" : changed ? "change-modified" : "";
+        return `<tr><td>${this.escapeHtml(key)}</td><td>${formatCell(hasOld ? oldMap[key] : undefined)}</td><td>${formatCell(hasNew ? newMap[key] : undefined)}</td><td class="${css}">${state}</td></tr>`;
+      }).join("");
+
+      return `<h3>${this.escapeHtml(title)}</h3>
+        <table class="context-table"><thead><tr><th>Name</th><th>At request start</th><th>After request</th><th>Change</th></tr></thead><tbody>${rows}</tbody></table>`;
+    };
+
+    const dataRows = (snapshot?: WebTestContextSnapshot): Record<string, unknown> => {
+      const flattened: Record<string, unknown> = {};
+      for (const [table, values] of Object.entries(snapshot?.dataRows ?? {})) {
+        for (const [name, value] of Object.entries(values ?? {})) {
+          flattened[`${table}.${name}`] = value;
+        }
+      }
+      return flattened;
+    };
+
+    return `<div class="context-snapshot">
+      <div class="field empty">Only request variables and data-row values are shown. Unchanged values are retained for comparison; added, modified and removed values are identified.</div>
+      ${renderChanges("Variables", before?.variables, after?.variables)}
+      ${renderChanges("Data Rows", dataRows(before), dataRows(after))}
     </div>`;
   }
 
