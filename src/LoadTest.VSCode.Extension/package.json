@@ -35,7 +35,20 @@
         "command": "deoloadtest.runLoadTest",
         "title": "DeoLoadTest: Run Load Test"
       }
-    ]
+    ],
+    "languages": [
+      {
+        "id": "yaml",
+        "extensions": [
+          ".webtest.yaml"
+        ]
+      }
+    ],
+    "yamlSchemas": {
+      "./schemas/webtest.schema.json": [
+        "*.webtest.yaml"
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
