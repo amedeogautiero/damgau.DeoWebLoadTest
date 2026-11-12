@@ -48,7 +48,19 @@ public sealed class WebTestRunner(EngineServices services)
 
         sw.Stop();
         ok = ok && failures.Count == 0;
-        services.Sink.TestCompleted(new TestMeasurement(ctx.User.ScenarioName, ctx.TestName, Micros(sw), ok));
+        var elapsedMicros = Micros(sw);
+        services.Sink.TestCompleted(new TestMeasurement(ctx.User.ScenarioName, ctx.TestName, elapsedMicros, ok));
+        Emit(new ExecutionEvent
+        {
+            EventType = "TestCompleted",
+            ScenarioName = ctx.User.ScenarioName,
+            TestName = ctx.TestName,
+            UserId = ctx.User.UserId,
+            Iteration = ctx.Iteration,
+            ElapsedMicros = elapsedMicros,
+            Success = ok,
+            Failures = failures.ToArray()
+        });
         return new WebTestResult(ok, failures, sw.Elapsed);
     }
 
@@ -164,6 +176,20 @@ public sealed class WebTestRunner(EngineServices services)
             Bind(req, f);
             foreach (var p in services.RequestPlugins) p.PreRequest(req);
 
+            Emit(new ExecutionEvent
+            {
+                EventType = "RequestStarted",
+                ScenarioName = f.Ctx.User.ScenarioName,
+                TestName = f.Ctx.TestName,
+                UserId = f.Ctx.User.UserId,
+                Iteration = f.Ctx.Iteration,
+                RequestName = step.Name,
+                Method = req.Method,
+                Url = req.Url,
+                RequestHeaders = new Dictionary<string, string>(req.Headers, StringComparer.OrdinalIgnoreCase),
+                RequestBody = req.Body
+            });
+
             try { resp = await services.Http.SendAsync(req, ct); }
             catch (TimeoutException ex) { errorType = "Timeout"; errorMessage = ex.Message; }
             catch (HttpRequestException ex) { errorType = "Http"; errorMessage = ex.Message; }
@@ -190,6 +216,28 @@ public sealed class WebTestRunner(EngineServices services)
             f.Ctx.User.ScenarioName, f.Ctx.TestName, step.Name, req.Url, f.Transaction,
             resp?.ElapsedMicros ?? 0, resp?.BytesSent ?? 0, resp?.Body.Length ?? 0, resp?.StatusCode ?? 0,
             success, errorType, errorMessage));
+
+        Emit(new ExecutionEvent
+        {
+            EventType = success ? "RequestCompleted" : "RequestFailed",
+            ScenarioName = f.Ctx.User.ScenarioName,
+            TestName = f.Ctx.TestName,
+            UserId = f.Ctx.User.UserId,
+            Iteration = f.Ctx.Iteration,
+            RequestName = step.Name,
+            Method = req.Method,
+            Url = req.Url,
+            RequestHeaders = new Dictionary<string, string>(req.Headers, StringComparer.OrdinalIgnoreCase),
+            RequestBody = req.Body,
+            StatusCode = resp?.StatusCode,
+            ReasonPhrase = resp?.ReasonPhrase,
+            ResponseHeaders = resp?.Headers,
+            ResponseBody = resp?.BodyText,
+            ElapsedMicros = resp?.ElapsedMicros,
+            ErrorType = errorType,
+            ErrorMessage = errorMessage,
+            Success = success
+        });
 
         if (!success)
         {
@@ -236,7 +284,21 @@ public sealed class WebTestRunner(EngineServices services)
         void Run(string name, IExtractionRule rule, IReadOnlyDictionary<string, string> args, bool required)
         {
             var r = rule.Extract(req, resp, args);
-            if (r.Success && r.Value is not null) f.Ctx.Parameters[name] = r.Value;
+            if (r.Success && r.Value is not null)
+            {
+                f.Ctx.Parameters[name] = r.Value;
+                Emit(new ExecutionEvent
+                {
+                    EventType = "VariablesUpdated",
+                    ScenarioName = f.Ctx.User.ScenarioName,
+                    TestName = f.Ctx.TestName,
+                    UserId = f.Ctx.User.UserId,
+                    Iteration = f.Ctx.Iteration,
+                    RequestName = step.Name,
+                    VariableName = name,
+                    VariableValue = r.Value
+                });
+            }
             else if (required) failures.Add($"estrazione '{name}': {r.Message}");
         }
 
@@ -246,6 +308,12 @@ public sealed class WebTestRunner(EngineServices services)
             Run(e.Name!, services.Rules.GetExtraction(e.Type, args), args, e.Required);
         }
         foreach (var b in req.ExtractionRules) Run(b.ParameterName, b.Rule, b.Args, b.Required);
+    }
+
+    private void Emit(ExecutionEvent executionEvent)
+    {
+        try { services.OnExecutionEvent?.Invoke(executionEvent); }
+        catch (Exception ex) { services.OnPluginError?.Invoke(ex); }
     }
 
     private static Dictionary<string, string> ResolveArgs(Dictionary<string, string> args, TestContext ctx)
