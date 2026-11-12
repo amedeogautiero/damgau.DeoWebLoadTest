@@ -17,9 +17,9 @@ function nodeAtPath(root: Node | null, segments: (string | number)[]): Node | nu
       const pair = current.items.find(item =>
         isScalar(item.key) && item.key.value === segment
       );
-      current = pair?.value ?? null;
+      current = (pair?.value as Node | undefined) ?? null;
     } else if (isSeq(current) && typeof segment === "number") {
-      current = current.items[segment] ?? null;
+      current = (current.items[segment] as Node | undefined) ?? null;
     } else {
       return null;
     }
