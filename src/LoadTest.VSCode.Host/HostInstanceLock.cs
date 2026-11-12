@@ -10,15 +10,13 @@ internal sealed class HostInstanceLock : IDisposable
     private readonly FileStream? _unixLock;
     private readonly Thread? _mutexThread;
     private readonly ManualResetEventSlim? _releaseMutex;
-    private readonly ManualResetEventSlim? _mutexAcquired;
 
     private HostInstanceLock(FileStream unixLock) => _unixLock = unixLock;
 
-    private HostInstanceLock(Thread mutexThread, ManualResetEventSlim releaseMutex, ManualResetEventSlim mutexAcquired)
+    private HostInstanceLock(Thread mutexThread, ManualResetEventSlim releaseMutex)
     {
         _mutexThread = mutexThread;
         _releaseMutex = releaseMutex;
-        _mutexAcquired = mutexAcquired;
     }
 
     public static HostInstanceLock Acquire()
@@ -31,14 +29,14 @@ internal sealed class HostInstanceLock : IDisposable
 
     private static HostInstanceLock AcquireWindowsMutex()
     {
-        using var acquired = new ManualResetEventSlim();
-        using var release = new ManualResetEventSlim();
+        var acquired = new ManualResetEventSlim();
+        var release = new ManualResetEventSlim();
         Exception? failure = null;
+        var ownsMutex = false;
 
         var thread = new Thread(() =>
         {
             using var mutex = new Mutex(false, @"Global\DeoLoadTest.LoadTest.VSCode.Host");
-            var ownsMutex = false;
 
             try
             {
@@ -74,30 +72,23 @@ internal sealed class HostInstanceLock : IDisposable
 
         thread.Start();
         acquired.Wait();
+        acquired.Dispose();
 
         if (failure is not null)
         {
             release.Set();
             thread.Join();
+            release.Dispose();
             throw new InvalidOperationException("Unable to create the machine-wide DeoLoadTest Host mutex.", failure);
         }
 
-        if (!thread.IsAlive)
-            throw new InvalidOperationException("Unable to keep the machine-wide DeoLoadTest Host mutex alive.");
-
-        // A live thread waiting on release means it owns the mutex. If it did not
-        // acquire it, it exits immediately after signalling acquired.
-        if (!IsMutexThreadWaiting(thread))
+        if (!ownsMutex)
+        {
+            release.Dispose();
             throw new InvalidOperationException("Another DeoLoadTest Host instance is already running on this machine.");
+        }
 
-        return new HostInstanceLock(thread, release, acquired);
-    }
-
-    private static bool IsMutexThreadWaiting(Thread thread)
-    {
-        // Give the lock thread a moment to leave the acquisition section.
-        thread.Join(20);
-        return thread.IsAlive;
+        return new HostInstanceLock(thread, release);
     }
 
     private static HostInstanceLock AcquireUnixFileLock()
@@ -146,7 +137,5 @@ internal sealed class HostInstanceLock : IDisposable
             _mutexThread.Join(TimeSpan.FromSeconds(2));
             _releaseMutex.Dispose();
         }
-
-        _mutexAcquired?.Dispose();
     }
 }
