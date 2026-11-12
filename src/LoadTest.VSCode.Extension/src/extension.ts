@@ -7,6 +7,7 @@ import { WebTestDebugSession, WebTestExecutionEvent } from "./webTestDebugSessio
 import { WebTestRequestExplorer } from "./webTestRequestExplorer";
 import { WebTestRequestInspector } from "./webTestRequestInspector";
 import { WebTestTimingInspector } from "./webTestTimingInspector";
+import { WebTestContextInspector } from "./webTestContextInspector";
 
 interface RunNotificationParams {
   runId?: string;
@@ -41,6 +42,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const requestExplorer = new WebTestRequestExplorer(webTestDebugSession);
   const requestInspector = new WebTestRequestInspector();
   const timingInspector = new WebTestTimingInspector();
+  const contextInspector = new WebTestContextInspector();
   const requestExplorerView = vscode.window.createTreeView("deoloadtest.requestExplorer", {
     treeDataProvider: requestExplorer,
     showCollapseAll: false
@@ -102,6 +104,9 @@ export function activate(context: vscode.ExtensionContext): void {
       case "webtest.event": {
         const event = params.event ?? {};
         webTestDebugSession.applyExecutionEvent(event);
+        if (event.eventType === "ContextSnapshot" || event.eventType === "VariablesUpdated") {
+          contextInspector.update(webTestDebugSession.context, webTestDebugSession.status);
+        }
         if (event.eventType === "RequestStarted" || event.eventType === "RequestCompleted" || event.eventType === "RequestFailed") {
           requestExplorer.refresh();
           const latestRequest = webTestDebugSession.requests[webTestDebugSession.requests.length - 1];
@@ -324,6 +329,11 @@ export function activate(context: vscode.ExtensionContext): void {
     () => timingInspector.show(webTestDebugSession.requests, webTestDebugSession.status)
   );
 
+  const showContextInspectorCommand = vscode.commands.registerCommand(
+    "deoloadtest.showContextInspector",
+    () => contextInspector.show(webTestDebugSession.context, webTestDebugSession.status)
+  );
+
   const focusRequestExplorerCommand = vscode.commands.registerCommand(
     "deoloadtest.focusRequestExplorer",
     async () => {
@@ -365,7 +375,9 @@ export function activate(context: vscode.ExtensionContext): void {
     requestExplorer,
     requestInspector,
     timingInspector,
+    contextInspector,
     showTimingInspectorCommand,
+    showContextInspectorCommand,
     clearRequestExplorerCommand,
     focusRequestExplorerCommand,
     communicationClient,
