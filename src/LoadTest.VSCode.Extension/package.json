@@ -22,7 +22,8 @@
     "onCommand:deoloadtest.showTimingInspector",
     "onCommand:deoloadtest.clearRequestExplorer",
     "onCommand:deoloadtest.stopWebTest",
-    "onCommand:deoloadtest.showDebugPanel"
+    "onCommand:deoloadtest.showDebugPanel",
+    "onCommand:deoloadtest.showVerticalDebugPanel"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -74,6 +75,11 @@
         "command": "deoloadtest.showDebugPanel",
         "title": "DeoLoadTest: Show Debug Panel",
         "icon": "$(debug)"
+      },
+      {
+        "command": "deoloadtest.showVerticalDebugPanel",
+        "title": "DeoLoadTest: Show Panel",
+        "icon": "$(layout-sidebar-right)"
       }
     ],
     "views": {
