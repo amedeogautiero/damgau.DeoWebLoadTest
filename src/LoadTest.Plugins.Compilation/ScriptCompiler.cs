@@ -1,6 +1,7 @@
 using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Emit;
 
 namespace LoadTest.Plugins.Compilation;
 
@@ -9,6 +10,9 @@ public sealed class ScriptCompilationException(IReadOnlyList<string> errors)
 {
     public IReadOnlyList<string> Errors { get; } = errors;
 }
+
+/// <summary>Assembly compilato e, quando richiesto, relativi simboli Portable PDB.</summary>
+public sealed record ScriptCompilationResult(byte[] Assembly, byte[]? Pdb);
 
 /// <summary>
 /// Compila sorgenti .csx in un assembly (IL portabile), una volta sola, sul controller (CONTRATTO sez. 1).
@@ -30,7 +34,20 @@ public static class ScriptCompiler
 
     /// <param name="sources">percorso relativo → testo.</param>
     public static byte[] Compile(string assemblyName, IReadOnlyDictionary<string, string> sources,
-        IReadOnlyList<MetadataReference>? references = null)
+        IReadOnlyList<MetadataReference>? references = null) =>
+        CompileCore(assemblyName, sources, references, emitPortablePdb: false).Assembly;
+
+    /// <summary>
+    /// Compila gli stessi sorgenti producendo anche un Portable PDB. I path delle chiavi di
+    /// <paramref name="sources"/> diventano i document path del PDB: per il debugging locale
+    /// il chiamante deve quindi passare i percorsi originali dei file sorgente.
+    /// </summary>
+    public static ScriptCompilationResult CompileWithSymbols(string assemblyName,
+        IReadOnlyDictionary<string, string> sources, IReadOnlyList<MetadataReference>? references = null) =>
+        CompileCore(assemblyName, sources, references, emitPortablePdb: true);
+
+    private static ScriptCompilationResult CompileCore(string assemblyName,
+        IReadOnlyDictionary<string, string> sources, IReadOnlyList<MetadataReference>? references, bool emitPortablePdb)
     {
         var parse = new CSharpParseOptions(LanguageVersion.Latest, DocumentationMode.None, SourceCodeKind.Regular);
         var trees = sources.OrderBy(s => s.Key, StringComparer.Ordinal)
@@ -38,8 +55,8 @@ public static class ScriptCompiler
         trees.Add(CSharpSyntaxTree.ParseText(ImplicitUsings, parse, path: "<usings>", encoding: Encoding.UTF8));
 
         var options = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
-            optimizationLevel: OptimizationLevel.Release, nullableContextOptions: NullableContextOptions.Enable,
-            allowUnsafe: false, deterministic: true);
+            optimizationLevel: emitPortablePdb ? OptimizationLevel.Debug : OptimizationLevel.Release,
+            nullableContextOptions: NullableContextOptions.Enable, allowUnsafe: false, deterministic: true);
 
         var compilation = CSharpCompilation.Create(assemblyName, trees, references ?? PluginReferences.FromRuntime(), options);
 
@@ -55,11 +72,14 @@ public static class ScriptCompiler
                 errors.Add($"riferimento non consentito: {name.Name}");
         if (errors.Count > 0) throw new ScriptCompilationException(errors);
 
-        using var ms = new MemoryStream();
-        var emit = compilation.Emit(ms);
+        using var pe = new MemoryStream();
+        using var pdb = emitPortablePdb ? new MemoryStream() : null;
+        var emit = compilation.Emit(pe, pdbStream: pdb,
+            options: emitPortablePdb ? new EmitOptions(debugInformationFormat: DebugInformationFormat.PortablePdb) : null);
         if (!emit.Success)
             throw new ScriptCompilationException(emit.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Select(d => d.ToString()).ToList());
-        return ms.ToArray();
+
+        return new ScriptCompilationResult(pe.ToArray(), pdb?.ToArray());
     }
 }
 
