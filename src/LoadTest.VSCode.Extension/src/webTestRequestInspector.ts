@@ -8,7 +8,7 @@ export class WebTestRequestInspector implements vscode.Disposable {
   private currentRequestId: number | undefined;
   private disposed = false;
 
-  show(request: DebugRequest): void {
+  show(request: DebugRequest, requests: readonly DebugRequest[]): void {
     if (this.disposed) return;
 
     if (!this.panel) {
@@ -32,20 +32,22 @@ export class WebTestRequestInspector implements vscode.Disposable {
 
     this.currentRequestId = request.id;
     this.panel.title = this.titleFor(request);
-    this.panel.webview.html = this.render(request);
+    this.panel.webview.html = this.render(request, requests);
   }
 
-  update(request: DebugRequest): void {
-    if (!this.panel || this.currentRequestId !== request.id) return;
+  update(requests: readonly DebugRequest[]): void {
+    if (!this.panel || this.currentRequestId === undefined) return;
+    const request = requests.find(item => item.id === this.currentRequestId);
+    if (!request) return;
     this.panel.title = this.titleFor(request);
-    this.panel.webview.html = this.render(request);
+    this.panel.webview.html = this.render(request, requests);
   }
 
   private titleFor(request: DebugRequest): string {
     return `Request #${String(request.id).padStart(3, "0")} — ${request.method ?? "HTTP"}`;
   }
 
-  private render(request: DebugRequest): string {
+  private render(request: DebugRequest, requests: readonly DebugRequest[]): string {
     const status = request.status === "pending"
       ? "Running"
       : request.status === "succeeded"
@@ -62,6 +64,10 @@ export class WebTestRequestInspector implements vscode.Disposable {
     const responseHeaders = this.formatValue(request.responseHeaders);
     const responseBody = this.formatValue(request.responseBody);
     const definition = this.formatValue(request.requestDefinition);
+    const startOffset = this.startOffsetMs(request, requests);
+    const duration = typeof request.elapsedMicros === "number"
+      ? `${(request.elapsedMicros / 1000).toFixed(2)} ms`
+      : request.status === "pending" ? "In progress" : "Unavailable";
 
     return `<!DOCTYPE html>
 <html lang="en">
@@ -93,10 +99,11 @@ export class WebTestRequestInspector implements vscode.Disposable {
     <span class="badge ${statusClass}">${status}</span>
     <span>${this.escapeHtml(request.method ?? "HTTP")}</span>
     <span>${this.escapeHtml(request.statusCode === undefined ? "No response" : `${request.statusCode} ${request.reasonPhrase ?? ""}`)}</span>
-    <span>${typeof request.elapsedMicros === "number" ? `${(request.elapsedMicros / 1000).toFixed(2)} ms` : "Timing unavailable"}</span>
   </div>
   <div class="url">${this.escapeHtml(request.url ?? "URL unavailable")}</div>
   <div class="field"><span class="label">Request name:</span>${this.escapeHtml(request.name ?? "—")}</div>
+  <div class="field"><span class="label">Start offset:</span>${startOffset === undefined ? "Unavailable" : `${startOffset.toFixed(2)} ms`}</div>
+  <div class="field"><span class="label">Duration:</span>${this.escapeHtml(duration)}</div>
   <div class="field"><span class="label">Started:</span>${this.escapeHtml(request.startedAt ?? "—")}</div>
   <div class="field"><span class="label">Completed:</span>${this.escapeHtml(request.completedAt ?? "—")}</div>
 
@@ -121,9 +128,23 @@ export class WebTestRequestInspector implements vscode.Disposable {
 </html>`;
   }
 
+  private startOffsetMs(request: DebugRequest, requests: readonly DebugRequest[]): number | undefined {
+    const starts = requests.map(item => this.parseTime(item.startedAt))
+      .filter((value): value is number => value !== undefined);
+    const start = this.parseTime(request.startedAt);
+    if (start === undefined || starts.length === 0) return undefined;
+    return Math.max(0, start - Math.min(...starts));
+  }
+
+  private parseTime(value?: string): number | undefined {
+    if (!value) return undefined;
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+
   private section(title: string, value: { text: string; truncated: boolean }): string {
     if (!value.text) return `<div class="field"><span class="label">${this.escapeHtml(title)}:</span><span class="empty">Not available</span></div>`;
-    return `<div class="field"><span class="label">${this.escapeHtml(title)}</span></div><pre>${this.escapeHtml(value.text)}${value.truncated ? "\n\n[Display truncated at 64 KB]" : ""}</pre>`;
+    return `<div class="field"><span class="label">${this.escapeHtml(title)}</span></div><pre>${this.escapeHtml(value.text)}${value.truncated ? "\\n\\n[Display truncated at 64 KB]" : ""}</pre>`;
   }
 
   private formatValue(value: unknown): { text: string; truncated: boolean } {
