@@ -3,7 +3,7 @@ import { DebugRequest, WebTestDebugSession } from "./webTestDebugSession";
 
 const TIMELINE_WIDTH = 16;
 
-export class WebTestRequestExplorer implements vscode.TreeDataProvider<DebugRequest> {
+export class WebTestRequestExplorer implements vscode.TreeDataProvider<DebugRequest | vscode.TreeItem> {
   private readonly changed = new vscode.EventEmitter<DebugRequest | undefined | void>();
   readonly onDidChangeTreeData = this.changed.event;
 
@@ -13,7 +13,8 @@ export class WebTestRequestExplorer implements vscode.TreeDataProvider<DebugRequ
     this.changed.fire();
   }
 
-  getTreeItem(request: DebugRequest): vscode.TreeItem {
+  getTreeItem(request: DebugRequest | vscode.TreeItem): vscode.TreeItem {
+    if (!("id" in request)) return request;
     const method = (request.method ?? "???").toUpperCase();
     const label = `#${String(request.id).padStart(3, "0")}  ${method}  ${this.shortUrl(request.url)}  │ ${this.timelineFor(request)}`;
     const item = new vscode.TreeItem(label, vscode.TreeItemCollapsibleState.None);
@@ -25,9 +26,20 @@ export class WebTestRequestExplorer implements vscode.TreeDataProvider<DebugRequ
     return item;
   }
 
-  getChildren(element?: DebugRequest): vscode.ProviderResult<DebugRequest[]> {
+  getChildren(element?: DebugRequest | vscode.TreeItem): vscode.ProviderResult<(DebugRequest | vscode.TreeItem)[]> {
     if (element) return [];
-    return [...this.session.requests];
+    const items: (DebugRequest | vscode.TreeItem)[] = [];
+    if (this.session.testName) {
+      const header = new vscode.TreeItem(`Test: ${this.session.testName}`, vscode.TreeItemCollapsibleState.None);
+      header.id = "deoloadtest.requestExplorer.testName";
+      header.contextValue = "deoloadtest.testHeader";
+      header.iconPath = new vscode.ThemeIcon("beaker");
+      header.description = this.session.status;
+      header.tooltip = `WebTest: ${this.session.testName}`;
+      items.push(header);
+    }
+    items.push(...this.session.requests);
+    return items;
   }
 
   private iconFor(status: DebugRequest["status"]): vscode.ThemeIcon {
