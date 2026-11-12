@@ -325,7 +325,8 @@ export function activate(context: vscode.ExtensionContext): void {
         runOutput.appendLine(`Starting WebTest: ${selection[0].fsPath}`);
         runOutput.appendLine("");
 
-        const result = await communicationClient.startWebTest(selection[0].fsPath);
+        // WebTest Debugger: compila i passi C# con Portable PDB per consentire i breakpoint CLR.
+        const result = await communicationClient.startWebTest(selection[0].fsPath, true);
         activeRunId = result.runId;
         activeWebTestRunId = result.runId;
         const testName = selection[0].fsPath.split(/[\\/]/).pop()?.replace(/\.webtest\.(yaml|yml)$/i, "") ?? selection[0].fsPath;
