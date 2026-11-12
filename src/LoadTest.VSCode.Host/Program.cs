@@ -2,9 +2,18 @@ namespace LoadTest.VSCode.Host;
 
 internal static class Program
 {
-    private static int Main(string[] args)
+    private static async Task<int> Main()
     {
-        Console.Error.WriteLine("LoadTest.VSCode.Host: not configured yet.");
-        return 0;
+        try
+        {
+            var server = new StdioJsonRpcServer(Console.In, Console.Out, Console.Error);
+            await server.RunAsync();
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine("LoadTest.VSCode.Host: " + ex);
+            return 1;
+        }
     }
 }
