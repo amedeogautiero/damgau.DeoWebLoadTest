@@ -109,11 +109,8 @@ public static class LocalLoadTestExecutor
                 Services = new EngineServices
                 {
                     Http = new UnusedHttpExecutor(),
-                    OnExecutionEvent = options.OnExecutionEvent is null ? null : executionEvent =>
-                    {
-                        try { options.OnExecutionEvent.Invoke(executionEvent); }
-                        catch (Exception ex) { NotifyObserverError(ex); }
-                    }
+                    OnExecutionEvent = options.OnExecutionEvent,
+                    OnPluginError = NotifyObserverError
                 },
                 HttpFactory = options.HttpFactory,
                 BaseDirectory = baseDir,
