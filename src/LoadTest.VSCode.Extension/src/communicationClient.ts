@@ -72,6 +72,10 @@ export class CommunicationClient implements vscode.Disposable {
     return this.request<RunStartResult>("webtest.run", { webTestFile, debugMode });
   }
 
+  async cancelRun(runId: string): Promise<{ accepted: boolean; runId: string }> {
+    return this.request<{ accepted: boolean; runId: string }>("run.cancel", { runId });
+  }
+
   onNotification(listener: (notification: HostNotification) => void): vscode.Disposable {
     this.notificationListeners.add(listener);
     return {

@@ -140,6 +140,56 @@ public class EngineTests
     }
 
     [Fact]
+    public async Task Runner_emits_debug_event_stream_and_initial_context_snapshot()
+    {
+        const string yaml = """
+            version: 1
+            baseUrl: https://x.it
+            context: { token: abc }
+            steps:
+              - name: Home
+                request: { method: GET, url: / }
+                extract:
+                  - { name: csrf, type: regex, pattern: 'csrf=(.+)', group: 1 }
+            """;
+        var events = new List<ExecutionEvent>();
+        var runner = new WebTestRunner(new EngineServices
+        {
+            Http = new FakeHttp { Handler = _ => (200, "csrf=xyz") },
+            OnExecutionEvent = events.Add
+        });
+        var context = NewCtx();
+        context.DataRows["users"] = new Dictionary<string, string> { ["name"] = "Ada" };
+
+        var result = await runner.RunAsync(WebTestLoader.Load(new StringReader(yaml)), context);
+
+        Assert.True(result.Success);
+        Assert.Contains(events, e => e.EventType == "ContextSnapshot");
+        Assert.Contains(events, e => e.EventType == "RequestStarted");
+        Assert.Contains(events, e => e.EventType == "VariablesUpdated" &&
+            e.VariableName == "csrf" && e.VariableValue == "xyz");
+        Assert.Contains(events, e => e.EventType == "RequestCompleted");
+        Assert.Contains(events, e => e.EventType == "TestCompleted");
+
+        var requestStartedSnapshot = Assert.IsType<System.Text.Json.JsonElement>(
+            System.Text.Json.JsonSerializer.SerializeToElement(
+                events.First(e => e.EventType == "RequestStarted").ContextSnapshot));
+        Assert.Equal("abc", requestStartedSnapshot.GetProperty("variables").GetProperty("token").GetString());
+
+        var requestCompletedSnapshot = Assert.IsType<System.Text.Json.JsonElement>(
+            System.Text.Json.JsonSerializer.SerializeToElement(
+                events.First(e => e.EventType == "RequestCompleted").ContextSnapshot));
+        Assert.Equal("xyz", requestCompletedSnapshot.GetProperty("variables").GetProperty("csrf").GetString());
+
+        var snapshot = Assert.IsType<System.Text.Json.JsonElement>(
+            System.Text.Json.JsonSerializer.SerializeToElement(
+                events.First(e => e.EventType == "ContextSnapshot").ContextSnapshot));
+        Assert.Equal("abc", snapshot.GetProperty("variables").GetProperty("token").GetString());
+        Assert.Equal("Ada", snapshot.GetProperty("dataRows").GetProperty("users").GetProperty("name").GetString());
+        Assert.Equal(7, snapshot.GetProperty("user").GetProperty("userId").GetInt32());
+    }
+
+    [Fact]
     public async Task Runner_stops_on_failed_validation()
     {
         var http = new FakeHttp { Handler = _ => (200, "niente") };

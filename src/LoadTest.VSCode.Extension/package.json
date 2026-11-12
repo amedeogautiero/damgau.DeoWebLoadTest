@@ -17,7 +17,13 @@
     "onCommand:deoloadtest.stopHost",
     "onCommand:deoloadtest.runLoadTest",
     "onCommand:deoloadtest.runWebTest",
-    "onCommand:deoloadtest.importHar"
+    "onCommand:deoloadtest.importHar",
+    "onCommand:deoloadtest.focusRequestExplorer",
+    "onCommand:deoloadtest.showTimingInspector",
+    "onCommand:deoloadtest.clearRequestExplorer",
+    "onCommand:deoloadtest.stopWebTest",
+    "onCommand:deoloadtest.showDebugPanel",
+    "onCommand:deoloadtest.showVerticalDebugPanel"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -40,13 +46,76 @@
       },
       {
         "command": "deoloadtest.runWebTest",
-        "title": "DeoLoadTest: Run WebTest"
+        "title": "DeoLoadTest: Run WebTest",
+        "icon": "$(play)"
       },
       {
         "command": "deoloadtest.importHar",
         "title": "DeoLoadTest: Import HAR"
+      },
+      {
+        "command": "deoloadtest.focusRequestExplorer",
+        "title": "DeoLoadTest: Focus Request Explorer"
+      },
+      {
+        "command": "deoloadtest.showTimingInspector",
+        "title": "DeoLoadTest: Show Timing Inspector"
+      },
+      {
+        "command": "deoloadtest.clearRequestExplorer",
+        "title": "DeoLoadTest: Clear Requests",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "deoloadtest.stopWebTest",
+        "title": "DeoLoadTest: Stop WebTest",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "deoloadtest.showDebugPanel",
+        "title": "DeoLoadTest: Show Debug Panel",
+        "icon": "$(debug)"
+      },
+      {
+        "command": "deoloadtest.showVerticalDebugPanel",
+        "title": "DeoLoadTest: Show Panel",
+        "icon": "$(layout-sidebar-right)"
       }
-    ]
+    ],
+    "views": {
+      "explorer": [
+        {
+          "id": "deoloadtest.requestExplorer",
+          "name": "DeoLoadTest - Request Explorer",
+          "when": "true"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "deoloadtest.requestExplorer",
+        "contents": "Run a WebTest to inspect its HTTP requests.\n[Run WebTest](command:deoloadtest.runWebTest)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "deoloadtest.runWebTest",
+          "when": "view == deoloadtest.requestExplorer && !deoloadtest.webTestRunning",
+          "group": "navigation@1"
+        },
+        {
+          "command": "deoloadtest.stopWebTest",
+          "when": "view == deoloadtest.requestExplorer && deoloadtest.webTestRunning",
+          "group": "navigation@2"
+        },
+        {
+          "command": "deoloadtest.clearRequestExplorer",
+          "when": "view == deoloadtest.requestExplorer",
+          "group": "navigation"
+        }
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",

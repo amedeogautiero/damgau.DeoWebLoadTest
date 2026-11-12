@@ -33,6 +33,7 @@ public sealed class WebTestRunner(EngineServices services)
         try
         {
             foreach (var p in services.WebTestPlugins) p.PreWebTest(ctx);
+            EmitContextSnapshot(ctx);
             ok = await ExecuteStepsAsync(def.Steps, frame, ct);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
@@ -82,10 +83,51 @@ public sealed class WebTestRunner(EngineServices services)
                 case CodeStep code: ok = await ExecuteCodeAsync(code, f, ct); break;
                 default: throw new NotSupportedException($"Passo non supportato: {step.GetType().Name}");
             }
+            EmitContextSnapshot(f.Ctx);
             if (!ok) return false;
         }
         return true;
     }
+
+    private void EmitContextSnapshot(WebTestContext ctx)
+    {
+        Emit(new ExecutionEvent
+        {
+            EventType = "ContextSnapshot",
+            ScenarioName = ctx.User.ScenarioName,
+            TestName = ctx.TestName,
+            UserId = ctx.User.UserId,
+            Iteration = ctx.Iteration,
+            ContextSnapshot = CaptureContextSnapshot(ctx)
+        });
+    }
+
+    private static object CaptureContextSnapshot(WebTestContext ctx) => new
+    {
+        variables = new Dictionary<string, string>(ctx.Parameters, StringComparer.Ordinal),
+        dataRows = ctx.DataRows.ToDictionary(
+            row => row.Key,
+            row => row.Value.ToDictionary(value => value.Key, value => value.Value, StringComparer.Ordinal),
+            StringComparer.Ordinal),
+        predefined = new
+        {
+            UserId = ctx.User.UserId,
+            TestName = ctx.TestName,
+            ScenarioName = ctx.User.ScenarioName,
+            WebTestIteration = ctx.Iteration,
+            LoadTestUserContext = ctx.User.UserContextId
+        },
+        user = new
+        {
+            userId = ctx.User.UserId,
+            userContextId = ctx.User.UserContextId,
+            agentId = ctx.User.AgentId,
+            agentName = ctx.User.AgentName,
+            controllerName = ctx.User.ControllerName,
+            scenarioName = ctx.User.ScenarioName,
+            isNewUser = ctx.User.IsNewUser
+        }
+    };
 
     private async Task<bool> ExecuteTransactionAsync(TransactionStep t, Frame f, CancellationToken ct)
     {
@@ -188,7 +230,8 @@ public sealed class WebTestRunner(EngineServices services)
                 Method = req.Method,
                 Url = req.Url,
                 RequestHeaders = new Dictionary<string, string>(req.Headers, StringComparer.OrdinalIgnoreCase),
-                RequestBody = req.Body
+                RequestBody = req.Body,
+                ContextSnapshot = CaptureContextSnapshot(f.Ctx)
             });
 
             var requestStopwatch = Stopwatch.StartNew();
@@ -241,6 +284,7 @@ public sealed class WebTestRunner(EngineServices services)
             ErrorType = errorType,
             ErrorMessage = errorMessage,
             ExceptionDetails = exceptionDetails,
+            ContextSnapshot = CaptureContextSnapshot(f.Ctx),
             RequestDefinition = new
             {
                 method = step.Method,
@@ -261,7 +305,7 @@ public sealed class WebTestRunner(EngineServices services)
         return true;
     }
 
-    // Richiesta riuscita se lo status atteso compare in uno degli hop (così `expectedStatus: 302` funziona anche con followRedirects);
+    // Richiesta riuscita se lo status atteso compare in uno degli hop (redirect inclusi);
     // senza expectedStatus l'ultimo status deve essere < 400. (PROPOSTA: il contratto non specifica)
     private static void CheckStatus(RequestStep step, ResponseContext resp, List<string> failures)
     {

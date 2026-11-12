@@ -3,6 +3,12 @@ import { CommunicationClient, HostNotification } from "./communicationClient";
 import { HostManager } from "./hostManager";
 import { importHarFile } from "./harImporter";
 import { registerWebTestValidator } from "./webTestValidator";
+import { WebTestDebugSession, WebTestExecutionEvent } from "./webTestDebugSession";
+import { WebTestRequestExplorer } from "./webTestRequestExplorer";
+import { WebTestRequestInspector } from "./webTestRequestInspector";
+import { WebTestTimingInspector } from "./webTestTimingInspector";
+import { WebTestDebugPanel } from "./webTestDebugPanel";
+import { WebTestDebugPanelVertical } from "./webTestDebugPanelVertical";
 
 interface RunNotificationParams {
   runId?: string;
@@ -23,7 +29,7 @@ interface RunNotificationParams {
     elapsedMs?: number;
     requests?: number;
   };
-  event?: { eventType?: string; requestName?: string; method?: string; url?: string; statusCode?: number; reasonPhrase?: string; success?: boolean; errorType?: string; errorMessage?: string; exceptionDetails?: string; elapsedMicros?: number; requestDefinition?: unknown };
+  event?: WebTestExecutionEvent;
   error?: { code?: string; message?: string; details?: string };
 }
 
@@ -33,6 +39,36 @@ export function activate(context: vscode.ExtensionContext): void {
   const runOutput = vscode.window.createOutputChannel("DeoLoadTest Run");
   registerWebTestValidator(context);
   let activeRunId: string | undefined;
+  let activeWebTestRunId: string | undefined;
+  void vscode.commands.executeCommand("setContext", "deoloadtest.webTestRunning", false);
+  const webTestDebugSession = new WebTestDebugSession();
+  const requestExplorer = new WebTestRequestExplorer(webTestDebugSession);
+  const requestInspector = new WebTestRequestInspector();
+  const timingInspector = new WebTestTimingInspector();
+  const debugPanel = new WebTestDebugPanel(
+    webTestDebugSession,
+    () => { void vscode.commands.executeCommand("deoloadtest.runWebTest"); },
+    () => { void vscode.commands.executeCommand("deoloadtest.stopWebTest"); },
+    () => { void vscode.commands.executeCommand("deoloadtest.clearRequestExplorer"); }
+  );
+  const verticalDebugPanel = new WebTestDebugPanelVertical(
+    webTestDebugSession,
+    () => { void vscode.commands.executeCommand("deoloadtest.runWebTest"); },
+    () => { void vscode.commands.executeCommand("deoloadtest.stopWebTest"); },
+    () => { void vscode.commands.executeCommand("deoloadtest.clearRequestExplorer"); },
+    () => { void vscode.commands.executeCommand("deoloadtest.startHost"); },
+    () => { void vscode.commands.executeCommand("deoloadtest.stopHost"); }
+  );
+  const requestExplorerView = vscode.window.createTreeView("deoloadtest.requestExplorer", {
+    treeDataProvider: requestExplorer,
+    showCollapseAll: false
+  });
+  const requestSelectionSubscription = requestExplorerView.onDidChangeSelection(({ selection }) => {
+    const selectedRequest = selection[0];
+    if (selectedRequest && (selectedRequest as vscode.TreeItem).contextValue !== "deoloadtest.testHeader") {
+      requestInspector.show(selectedRequest as import("./webTestDebugSession").DebugRequest, webTestDebugSession.requests);
+    }
+  });
   let webTestRequestRows: string[] = [];
   let webTestFailureDetails: string[] = [];
   let webTestSuccessfulRequests = 0;
@@ -83,6 +119,15 @@ export function activate(context: vscode.ExtensionContext): void {
         break;
       case "webtest.event": {
         const event = params.event ?? {};
+        webTestDebugSession.applyExecutionEvent(event);
+        if (event.eventType === "RequestStarted" || event.eventType === "RequestCompleted" || event.eventType === "RequestFailed") {
+          requestExplorer.refresh();
+          const latestRequest = webTestDebugSession.requests[webTestDebugSession.requests.length - 1];
+          requestInspector.update(webTestDebugSession.requests);
+          timingInspector.update(webTestDebugSession.requests, webTestDebugSession.status);
+          debugPanel.update();
+          verticalDebugPanel.update(latestRequest?.id);
+        }
         if (event.eventType === "RequestCompleted" || event.eventType === "RequestFailed") {
           const success = event.eventType === "RequestCompleted";
           if (success) webTestSuccessfulRequests++;
@@ -124,6 +169,11 @@ export function activate(context: vscode.ExtensionContext): void {
       }
       case "webtest.completed": {
         const result = params.result ?? {};
+        webTestDebugSession.complete(result);
+        requestExplorer.refresh();
+        timingInspector.update(webTestDebugSession.requests, webTestDebugSession.status);
+        debugPanel.update();
+          verticalDebugPanel.update();
         const total = webTestSuccessfulRequests + webTestFailedRequests;
         runOutput.appendLine("");
         runOutput.appendLine("Requests:");
@@ -142,6 +192,8 @@ export function activate(context: vscode.ExtensionContext): void {
         runOutput.appendLine(`  Total duration: ${(result.elapsedMs ?? 0).toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} ms`);
         for (const failure of result.failures ?? []) runOutput.appendLine(`  ${failure}`);
         activeRunId = undefined;
+        activeWebTestRunId = undefined;
+        void vscode.commands.executeCommand("setContext", "deoloadtest.webTestRunning", false);
         if (result.success) {
           void vscode.window.showInformationMessage("WebTest completed successfully.");
         } else {
@@ -150,16 +202,30 @@ export function activate(context: vscode.ExtensionContext): void {
         break;
       }
       case "webtest.failed":
+        webTestDebugSession.fail();
+        requestExplorer.refresh();
+        timingInspector.update(webTestDebugSession.requests, webTestDebugSession.status);
+        debugPanel.update();
+          verticalDebugPanel.update();
         runOutput.appendLine(`WebTest execution failed: ${params.error?.message ?? "Unknown error"}`);
         if (params.error?.details) runOutput.appendLine(params.error.details);
         activeRunId = undefined;
+        activeWebTestRunId = undefined;
+        void vscode.commands.executeCommand("setContext", "deoloadtest.webTestRunning", false);
         void vscode.window.showErrorMessage(
           `WebTest execution failed: ${params.error?.message ?? "Unknown error"}`
         );
         break;
       case "webtest.cancelled":
+        webTestDebugSession.cancel();
+        requestExplorer.refresh();
+        timingInspector.update(webTestDebugSession.requests, webTestDebugSession.status);
+        debugPanel.update();
+          verticalDebugPanel.update();
         runOutput.appendLine(`WebTest ${params.runId ?? activeRunId ?? ""} cancelled.`);
         activeRunId = undefined;
+        activeWebTestRunId = undefined;
+        void vscode.commands.executeCommand("setContext", "deoloadtest.webTestRunning", false);
         void vscode.window.showInformationMessage("WebTest cancelled.");
         break;
       default:
@@ -229,6 +295,10 @@ export function activate(context: vscode.ExtensionContext): void {
   const runWebTestCommand = vscode.commands.registerCommand(
     "deoloadtest.runWebTest",
     async () => {
+      if (webTestDebugSession.status === "running") {
+        void vscode.window.showWarningMessage("A WebTest is already running.");
+        return;
+      }
       if (!hostManager.isRunning || !communicationClient.isInitialized) {
         void vscode.window.showErrorMessage(
           "DeoLoadTest Host is not started and initialized. Run 'DeoLoadTest: Start Host' first."
@@ -257,12 +327,80 @@ export function activate(context: vscode.ExtensionContext): void {
 
         const result = await communicationClient.startWebTest(selection[0].fsPath);
         activeRunId = result.runId;
+        activeWebTestRunId = result.runId;
+        const testName = selection[0].fsPath.split(/[\\/]/).pop()?.replace(/\.webtest\.(yaml|yml)$/i, "") ?? selection[0].fsPath;
+        webTestDebugSession.start(result.runId, new Date().toISOString(), testName);
+        void vscode.commands.executeCommand("setContext", "deoloadtest.webTestRunning", true);
+        requestExplorer.refresh();
+        timingInspector.update(webTestDebugSession.requests, webTestDebugSession.status);
+        verticalDebugPanel.show();
         runOutput.appendLine(`WebTest accepted. Run ID: ${result.runId}`);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         runOutput.appendLine(`Unable to start WebTest: ${message}`);
         void vscode.window.showErrorMessage(`Unable to start WebTest: ${message}`);
       }
+    }
+  );
+
+  const stopWebTestCommand = vscode.commands.registerCommand(
+    "deoloadtest.stopWebTest",
+    async () => {
+      const runId = activeWebTestRunId;
+      if (!runId) {
+        void vscode.window.showInformationMessage("There is no active WebTest to stop.");
+        return;
+      }
+
+      try {
+        const result = await communicationClient.cancelRun(runId);
+        if (result.accepted) {
+          runOutput.appendLine("Cancellation requested for WebTest " + runId + ".");
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        void vscode.window.showErrorMessage("Unable to stop WebTest: " + message);
+      }
+    }
+  );
+
+  const clearRequestExplorerCommand = vscode.commands.registerCommand(
+    "deoloadtest.clearRequestExplorer",
+    async () => {
+      if (webTestDebugSession.requests.length === 0) return;
+      const answer = await vscode.window.showWarningMessage(
+        "Clear all requests from the Request Explorer? The running WebTest will continue.",
+        { modal: true },
+        "Clear"
+      );
+      if (answer !== "Clear") return;
+      webTestDebugSession.clearRequests();
+      requestExplorer.refresh();
+      debugPanel.update();
+          verticalDebugPanel.update();
+    }
+  );
+
+  const showDebugPanelCommand = vscode.commands.registerCommand(
+    "deoloadtest.showDebugPanel",
+    () => debugPanel.show()
+  );
+
+  const showVerticalDebugPanelCommand = vscode.commands.registerCommand(
+    "deoloadtest.showVerticalDebugPanel",
+    () => verticalDebugPanel.show()
+  );
+
+  const showTimingInspectorCommand = vscode.commands.registerCommand(
+    "deoloadtest.showTimingInspector",
+    () => timingInspector.show(webTestDebugSession.requests, webTestDebugSession.status)
+  );
+
+  const focusRequestExplorerCommand = vscode.commands.registerCommand(
+    "deoloadtest.focusRequestExplorer",
+    async () => {
+      await vscode.commands.executeCommand("workbench.view.explorer");
+      await vscode.commands.executeCommand("deoloadtest.requestExplorer.focus");
     }
   );
 
@@ -291,9 +429,22 @@ export function activate(context: vscode.ExtensionContext): void {
     startHostCommand,
     runLoadTestCommand,
     runWebTestCommand,
+    stopWebTestCommand,
     importHarCommand,
     stopHostCommand,
     notificationSubscription,
+    requestExplorerView,
+    requestSelectionSubscription,
+    requestExplorer,
+    requestInspector,
+    timingInspector,
+    debugPanel,
+    verticalDebugPanel,
+    showDebugPanelCommand,
+    showVerticalDebugPanelCommand,
+    showTimingInspectorCommand,
+    clearRequestExplorerCommand,
+    focusRequestExplorerCommand,
     communicationClient,
     hostManager,
     runOutput

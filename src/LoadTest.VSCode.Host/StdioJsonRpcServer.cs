@@ -59,7 +59,6 @@ internal sealed class StdioJsonRpcServer(TextReader input, TextWriter output, Te
 
     public async Task RunAsync(CancellationToken cancellationToken = default)
     {
-        // Announce readiness through JSON-RPC as soon as the server loop starts.
         WriteNotification("host.ready", new
         {
             protocolVersion = "1.0",
@@ -111,8 +110,6 @@ internal sealed class StdioJsonRpcServer(TextReader input, TextWriter output, Te
             return Task.CompletedTask;
         }
 
-        // The host currently exposes request/response methods only. Notifications from
-        // the client are ignored because every state-changing method needs an acknowledgement.
         if (!message.TryGetProperty("id", out var idElement))
             return Task.CompletedTask;
 
@@ -255,14 +252,13 @@ internal sealed class StdioJsonRpcServer(TextReader input, TextWriter output, Te
                     if (executionEvent.EventType == "RequestStarted")
                         Interlocked.Increment(ref requestCount);
 
-                    if (executionEvent.EventType is "RequestCompleted" or "RequestFailed")
+                    // A WebTest run is already a single-iteration debug session.
+                    // Forward the complete event stream; the extension decides what to display.
+                    WriteNotification("webtest.event", new
                     {
-                        WriteNotification("webtest.event", new
-                        {
-                            runId = active.RunId,
-                            @event = executionEvent
-                        });
-                    }
+                        runId = active.RunId,
+                        @event = executionEvent
+                    });
                 }
             });
 
