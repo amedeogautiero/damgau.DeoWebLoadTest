@@ -325,6 +325,7 @@ export function activate(context: vscode.ExtensionContext): void {
         if (!hostManager.isRunning) await hostManager.start();
         if (!communicationClient.isInitialized) await communicationClient.initialize();
         await hostDebugger.attach();
+        runOutput.appendLine(`C# debugger attached to DeoLoadTest Host (PID ${hostManager.processId}).`);
 
         // Compila i passi C# con Portable PDB per consentire i breakpoint CLR.
         const result = await communicationClient.startWebTest(selection[0].fsPath, true);
