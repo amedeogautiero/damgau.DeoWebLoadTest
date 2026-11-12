@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using LoadTest.Engine.Http;
 using LoadTest.Execution;
+using LoadTest.Engine.Runtime;
 
 namespace LoadTest.VSCode.Host;
 
@@ -117,6 +118,7 @@ internal sealed class StdioJsonRpcServer(TextReader input, TextWriter output, Te
                         {
                             localLoadTest = true,
                             progressNotifications = true,
+                            executionEvents = true,
                             cancellation = true,
                             concurrentRuns = false
                         }
@@ -221,6 +223,20 @@ internal sealed class StdioJsonRpcServer(TextReader input, TextWriter output, Te
                     runId = active.RunId,
                     snapshot
                 }),
+                OnExecutionEvent = executionEvent =>
+                {
+                    var notification = executionEvent.EventType switch
+                    {
+                        "RequestStarted" => "debug.requestStarted",
+                        "RequestCompleted" => "debug.requestCompleted",
+                        "RequestFailed" => "debug.requestFailed",
+                        "VariablesUpdated" => "debug.variablesUpdated",
+                        "TestCompleted" => "debug.testCompleted",
+                        _ => null
+                    };
+                    if (notification is not null)
+                        WriteNotification(notification, new { runId = active.RunId, @event = executionEvent });
+                },
                 OnObserverError = ex => error.WriteLine("observer warning: " + ex.Message)
             }, active.Cancellation.Token);
 
