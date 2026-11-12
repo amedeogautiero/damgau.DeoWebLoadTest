@@ -6,7 +6,7 @@ namespace LoadTest.Plugins;
 
 /// <summary>
 /// Implementa ICodeStepHost per i passi `code: percorso.csx`. Il file deve contenere esattamente un ICodedTest.
-/// `resolve` trasforma il percorso in un pacchetto compilato (controller: ScriptPackageCompiler.CompileSingleFile; l'agente non ha Roslyn).
+/// `resolve` trasforma il percorso in un pacchetto compilato (Controller o VS Code Host); l'Agent riceve pacchetti già compilati.
 /// Limite noto (P3): ICodedTest.RunAsync non ha accesso a un esecutore HTTP, quindi il passo può solo leggere/scrivere il contesto.
 /// </summary>
 public sealed class CodeStepHost(Func<string, PluginPackage> resolve) : ICodeStepHost, IDisposable
