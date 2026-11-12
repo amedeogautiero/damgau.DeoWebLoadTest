@@ -35,6 +35,12 @@
         "command": "deoloadtest.runLoadTest",
         "title": "DeoLoadTest: Run Load Test"
       }
+    ],
+    "yamlValidation": [
+      {
+        "fileMatch": "*.webtest.yaml",
+        "url": "./schemas/webtest.schema.json"
+      }
     ]
   },
   "scripts": {
@@ -46,5 +52,8 @@
     "@types/node": "^20.17.0",
     "@types/vscode": "^1.90.0",
     "typescript": "^5.7.2"
-  }
+  },
+  "extensionDependencies": [
+    "redhat.vscode-yaml"
+  ]
 }
