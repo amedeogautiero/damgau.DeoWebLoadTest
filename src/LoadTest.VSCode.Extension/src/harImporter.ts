@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import * as path from "path";
+import { stringify } from "yaml";
 
 interface HarHeader {
   name: string;
@@ -9,6 +10,7 @@ interface HarHeader {
 interface HarPostData {
   mimeType?: string;
   text?: string;
+  encoding?: string;
   params?: Array<{
     name: string;
     value?: string;
@@ -41,7 +43,7 @@ interface WebTestStep {
     method: string;
     url: string;
     headers?: Record<string, string>;
-    body?: { raw: string } | { form: Record<string, string> } | {
+    body?: { raw: string } | { file: string } | { form: Record<string, string> } | {
       multipart: Array<{
         name: string;
         value?: string;
@@ -53,10 +55,14 @@ interface WebTestStep {
   };
 }
 
-function yamlString(value: string): string {
-  // JSON string literals are valid YAML double-quoted scalars and preserve
-  // newlines, quotes, backslashes and other special characters.
-  return JSON.stringify(value);
+interface BinaryAsset {
+  relativePath: string;
+  content: Buffer;
+}
+
+interface ConvertedWebTest {
+  yaml: string;
+  assets: BinaryAsset[];
 }
 
 function getRequestHeaders(headers: HarHeader[] | undefined): Record<string, string> {
@@ -81,23 +87,73 @@ function getRequestHeaders(headers: HarHeader[] | undefined): Record<string, str
   return result;
 }
 
-function getRequestBody(postData: HarPostData | undefined): WebTestStep["request"]["body"] {
-  if (!postData) return undefined;
+function isTextMimeType(mimeType: string): boolean {
+  const mime = mimeType.split(";", 1)[0].trim().toLowerCase();
+  return mime.startsWith("text/") ||
+    mime === "application/json" ||
+    mime === "application/xml" ||
+    mime === "application/javascript" ||
+    mime === "application/x-www-form-urlencoded" ||
+    mime === "application/graphql" ||
+    mime.endsWith("+json") ||
+    mime.endsWith("+xml");
+}
+
+function containsBinaryControlCharacters(value: string): boolean {
+  // Keep the ordinary text controls used in textual payloads (TAB, LF, CR).
+  return /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/.test(value);
+}
+
+function getBinaryBytes(postData: HarPostData): Buffer {
+  if ((postData.encoding ?? "").toLowerCase() === "base64") {
+    return Buffer.from(postData.text ?? "", "base64");
+  }
+
+  const text = postData.text ?? "";
+  // HAR exporters commonly expose binary request bodies as a byte-preserving
+  // Latin-1 string. If it contains non-Latin-1 characters, retain its UTF-8
+  // representation rather than silently truncating those characters.
+  const isByteString = Array.from(text).every(character => character.codePointAt(0)! <= 0xff);
+  return Buffer.from(text, isByteString ? "latin1" : "utf8");
+}
+
+function getRequestBody(
+  postData: HarPostData | undefined,
+  requestNumber: number,
+  assetsDirectoryName: string
+): { body: WebTestStep["request"]["body"]; asset?: BinaryAsset } {
+  if (!postData) return { body: undefined };
 
   if (typeof postData.text === "string") {
-    return { raw: postData.text };
+    const mimeType = postData.mimeType ?? "";
+    const isBinary = (postData.encoding ?? "").toLowerCase() === "base64" ||
+      (mimeType.length > 0 && !isTextMimeType(mimeType)) ||
+      containsBinaryControlCharacters(postData.text);
+
+    if (isBinary) {
+      const fileName = `request-${String(requestNumber).padStart(3, "0")}.body.bin`;
+      const relativePath = path.posix.join(assetsDirectoryName, fileName);
+      return {
+        body: { file: relativePath },
+        asset: { relativePath, content: getBinaryBytes(postData) }
+      };
+    }
+
+    return { body: { raw: postData.text } };
   }
 
   if (postData.params?.length) {
     const isMultipart = (postData.mimeType ?? "").toLowerCase().includes("multipart/form-data");
     if (isMultipart) {
       return {
-        multipart: postData.params.map(parameter => ({
-          name: parameter.name,
-          ...(parameter.value !== undefined ? { value: parameter.value } : {}),
-          ...(parameter.fileName ? { fileName: parameter.fileName } : {}),
-          ...(parameter.contentType ? { contentType: parameter.contentType } : {})
-        }))
+        body: {
+          multipart: postData.params.map(parameter => ({
+            name: parameter.name,
+            ...(parameter.value !== undefined ? { value: parameter.value } : {}),
+            ...(parameter.fileName ? { fileName: parameter.fileName } : {}),
+            ...(parameter.contentType ? { contentType: parameter.contentType } : {})
+          }))
+        }
       };
     }
 
@@ -105,13 +161,18 @@ function getRequestBody(postData: HarPostData | undefined): WebTestStep["request
     for (const parameter of postData.params) {
       form[parameter.name] = parameter.value ?? "";
     }
-    return { form };
+    return { body: { form } };
   }
 
-  return undefined;
+  return { body: undefined };
 }
 
-function toWebTestYaml(name: string, entries: HarEntry[]): string {
+function toWebTestYaml(
+  name: string,
+  entries: HarEntry[],
+  assetsDirectoryName: string
+): ConvertedWebTest {
+  const assets: BinaryAsset[] = [];
   const steps: WebTestStep[] = entries.map((entry, index) => {
     const request = entry?.request;
     if (!request || typeof request.method !== "string" || typeof request.url !== "string") {
@@ -119,7 +180,8 @@ function toWebTestYaml(name: string, entries: HarEntry[]): string {
     }
 
     const headers = getRequestHeaders(request.headers);
-    const body = getRequestBody(request.postData);
+    const convertedBody = getRequestBody(request.postData, index + 1, assetsDirectoryName);
+    if (convertedBody.asset) assets.push(convertedBody.asset);
 
     return {
       name: `Request ${String(index + 1).padStart(3, "0")} - ${request.method.toUpperCase()}`,
@@ -127,59 +189,20 @@ function toWebTestYaml(name: string, entries: HarEntry[]): string {
         method: request.method.toUpperCase(),
         url: request.url,
         ...(Object.keys(headers).length ? { headers } : {}),
-        ...(body ? { body } : {})
+        ...(convertedBody.body ? { body: convertedBody.body } : {})
       }
     };
   });
 
-  const lines = [
-    "version: 1",
-    `name: ${yamlString(name)}`,
-    "steps:"
-  ];
+  // Use a YAML serializer instead of hand-written quoting. This safely escapes
+  // quotes, newlines and control characters in URLs, headers and text bodies.
+  const yaml = stringify({
+    version: 1,
+    name,
+    steps: steps.length ? steps : []
+  }, { lineWidth: 0 });
 
-  if (steps.length === 0) {
-    lines.push("  []");
-    return lines.join("\n") + "\n";
-  }
-
-  for (const step of steps) {
-    lines.push(`  - name: ${yamlString(step.name)}`);
-    lines.push("    request:");
-    lines.push(`      method: ${yamlString(step.request.method)}`);
-    lines.push(`      url: ${yamlString(step.request.url)}`);
-
-    if (step.request.headers) {
-      lines.push("      headers:");
-      for (const [headerName, headerValue] of Object.entries(step.request.headers)) {
-        lines.push(`        ${yamlString(headerName)}: ${yamlString(headerValue)}`);
-      }
-    }
-
-    if (step.request.body) {
-      if ("raw" in step.request.body) {
-        lines.push("      body:");
-        lines.push(`        raw: ${yamlString(step.request.body.raw)}`);
-      } else if ("form" in step.request.body) {
-        lines.push("      body:");
-        lines.push("        form:");
-        for (const [fieldName, fieldValue] of Object.entries(step.request.body.form)) {
-          lines.push(`          ${yamlString(fieldName)}: ${yamlString(fieldValue)}`);
-        }
-      } else {
-        lines.push("      body:");
-        lines.push("        multipart:");
-        for (const part of step.request.body.multipart) {
-          lines.push(`          - name: ${yamlString(part.name)}`);
-          if (part.value !== undefined) lines.push(`            value: ${yamlString(part.value)}`);
-          if (part.fileName !== undefined) lines.push(`            fileName: ${yamlString(part.fileName)}`);
-          if (part.contentType !== undefined) lines.push(`            contentType: ${yamlString(part.contentType)}`);
-        }
-      }
-    }
-  }
-
-  return lines.join("\n") + "\n";
+  return { yaml, assets };
 }
 
 export async function importHarFile(): Promise<void> {
@@ -211,6 +234,8 @@ export async function importHarFile(): Promise<void> {
 
   const baseName = path.basename(harUri.fsPath, path.extname(harUri.fsPath));
   const outputUri = vscode.Uri.joinPath(workspaceFolder.uri, `${baseName}.webtest.yaml`);
+  const assetsDirectoryName = `${baseName}.webtest.assets`;
+  const assetsDirectoryUri = vscode.Uri.joinPath(workspaceFolder.uri, assetsDirectoryName);
 
   try {
     await vscode.workspace.fs.stat(outputUri);
@@ -226,12 +251,32 @@ export async function importHarFile(): Promise<void> {
     }
   }
 
-  const yaml = toWebTestYaml(baseName, entries);
-  await vscode.workspace.fs.writeFile(outputUri, Buffer.from(yaml, "utf8"));
+  const converted = toWebTestYaml(baseName, entries, assetsDirectoryName);
+
+  // Binary bodies are stored as sidecar files. WebTest's existing body.file
+  // support resolves these paths relative to the generated YAML file.
+  if (converted.assets.length > 0) {
+    try {
+      await vscode.workspace.fs.stat(assetsDirectoryUri);
+      await vscode.workspace.fs.delete(assetsDirectoryUri, { recursive: true, useTrash: false });
+    } catch (error) {
+      if (!(error instanceof vscode.FileSystemError) || error.code !== "FileNotFound") {
+        throw error;
+      }
+    }
+
+    await vscode.workspace.fs.createDirectory(assetsDirectoryUri);
+    for (const asset of converted.assets) {
+      const assetUri = vscode.Uri.joinPath(assetsDirectoryUri, path.posix.basename(asset.relativePath));
+      await vscode.workspace.fs.writeFile(assetUri, asset.content);
+    }
+  }
+
+  await vscode.workspace.fs.writeFile(outputUri, Buffer.from(converted.yaml, "utf8"));
 
   const openDocument = await vscode.workspace.openTextDocument(outputUri);
   await vscode.window.showTextDocument(openDocument);
   void vscode.window.showInformationMessage(
-    `HAR imported: ${entries.length} HTTP requests converted to WebTest and saved in the workspace.`
+    `HAR imported: ${entries.length} HTTP requests converted to WebTest and saved in the workspace (${converted.assets.length} binary body files).`
   );
 }
