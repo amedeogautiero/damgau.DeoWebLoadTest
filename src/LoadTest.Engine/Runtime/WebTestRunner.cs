@@ -33,6 +33,34 @@ public sealed class WebTestRunner(EngineServices services)
         try
         {
             foreach (var p in services.WebTestPlugins) p.PreWebTest(ctx);
+            Emit(new ExecutionEvent
+            {
+                EventType = "ContextSnapshot",
+                ScenarioName = ctx.User.ScenarioName,
+                TestName = ctx.TestName,
+                UserId = ctx.User.UserId,
+                Iteration = ctx.Iteration,
+                ContextSnapshot = new
+                {
+                    variables = new Dictionary<string, string>(ctx.Parameters, StringComparer.Ordinal),
+                    dataRows = ctx.DataRows.ToDictionary(
+                        row => row.Key,
+                        row => row.Value.ToDictionary(value => value.Key, value => value.Value, StringComparer.Ordinal),
+                        StringComparer.Ordinal),
+                    user = new
+                    {
+                        userId = ctx.User.UserId,
+                        userContextId = ctx.User.UserContextId,
+                        agentId = ctx.User.AgentId,
+                        agentName = ctx.User.AgentName,
+                        controllerName = ctx.User.ControllerName,
+                        scenarioName = ctx.User.ScenarioName,
+                        isNewUser = ctx.User.IsNewUser
+                    },
+                    userItems = new Dictionary<string, object?>(ctx.User.Items, StringComparer.Ordinal),
+                    items = new Dictionary<string, object?>(ctx.Items, StringComparer.Ordinal)
+                }
+            });
             ok = await ExecuteStepsAsync(def.Steps, frame, ct);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
@@ -261,7 +289,7 @@ public sealed class WebTestRunner(EngineServices services)
         return true;
     }
 
-    // Richiesta riuscita se lo status atteso compare in uno degli hop (così `expectedStatus: 302` funziona anche con followRedirects);
+    // Richiesta riuscita se lo status atteso compare in uno degli hop (redirect inclusi);
     // senza expectedStatus l'ultimo status deve essere < 400. (PROPOSTA: il contratto non specifica)
     private static void CheckStatus(RequestStep step, ResponseContext resp, List<string> failures)
     {
