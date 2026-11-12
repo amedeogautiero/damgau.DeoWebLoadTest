@@ -109,9 +109,9 @@ public static class LocalLoadTestExecutor
                 Services = new EngineServices
                 {
                     Http = new UnusedHttpExecutor(),
-                    OnExecutionEvent = executionEvent =>
+                    OnExecutionEvent = options.OnExecutionEvent is null ? null : executionEvent =>
                     {
-                        try { options.OnExecutionEvent?.Invoke(executionEvent); }
+                        try { options.OnExecutionEvent.Invoke(executionEvent); }
                         catch (Exception ex) { NotifyObserverError(ex); }
                     }
                 },
