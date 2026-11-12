@@ -16,6 +16,7 @@
     "onCommand:deoloadtest.startHost",
     "onCommand:deoloadtest.stopHost",
     "onCommand:deoloadtest.runLoadTest",
+    "onCommand:deoloadtest.runWebTest",
     "onCommand:deoloadtest.importHar"
   ],
   "main": "./out/extension.js",
@@ -36,6 +37,10 @@
       {
         "command": "deoloadtest.runLoadTest",
         "title": "DeoLoadTest: Run Load Test"
+      },
+      {
+        "command": "deoloadtest.runWebTest",
+        "title": "DeoLoadTest: Run WebTest"
       },
       {
         "command": "deoloadtest.importHar",
