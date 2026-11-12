@@ -45,6 +45,7 @@ public sealed class LoadTestRunnerOptions
     public string ControllerName { get; init; } = "local";
     public Action<IntervalSnapshot>? OnInterval { get; init; }
     public Action<Exception>? OnPluginError { get; init; }
+    public Action<ExecutionEvent>? OnExecutionEvent { get; init; }
 }
 
 internal sealed class RunGate { public volatile bool Recording; }
