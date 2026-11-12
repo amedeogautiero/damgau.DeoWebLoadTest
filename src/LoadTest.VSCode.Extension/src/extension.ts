@@ -6,6 +6,7 @@ import { registerWebTestValidator } from "./webTestValidator";
 import { WebTestDebugSession, WebTestExecutionEvent } from "./webTestDebugSession";
 import { WebTestRequestExplorer } from "./webTestRequestExplorer";
 import { WebTestRequestInspector } from "./webTestRequestInspector";
+import { WebTestTimingInspector } from "./webTestTimingInspector";
 
 interface RunNotificationParams {
   runId?: string;
@@ -39,6 +40,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const webTestDebugSession = new WebTestDebugSession();
   const requestExplorer = new WebTestRequestExplorer(webTestDebugSession);
   const requestInspector = new WebTestRequestInspector();
+  const timingInspector = new WebTestTimingInspector();
   const requestExplorerView = vscode.window.createTreeView("deoloadtest.requestExplorer", {
     treeDataProvider: requestExplorer,
     showCollapseAll: false
@@ -102,6 +104,7 @@ export function activate(context: vscode.ExtensionContext): void {
           requestExplorer.refresh();
           const latestRequest = webTestDebugSession.requests[webTestDebugSession.requests.length - 1];
           if (latestRequest) requestInspector.update(latestRequest);
+          timingInspector.update(webTestDebugSession.requests, webTestDebugSession.status);
         }
         if (event.eventType === "RequestCompleted" || event.eventType === "RequestFailed") {
           const success = event.eventType === "RequestCompleted";
@@ -146,6 +149,7 @@ export function activate(context: vscode.ExtensionContext): void {
         const result = params.result ?? {};
         webTestDebugSession.complete(result);
         requestExplorer.refresh();
+        timingInspector.update(webTestDebugSession.requests, webTestDebugSession.status);
         const total = webTestSuccessfulRequests + webTestFailedRequests;
         runOutput.appendLine("");
         runOutput.appendLine("Requests:");
@@ -174,6 +178,7 @@ export function activate(context: vscode.ExtensionContext): void {
       case "webtest.failed":
         webTestDebugSession.fail();
         requestExplorer.refresh();
+        timingInspector.update(webTestDebugSession.requests, webTestDebugSession.status);
         runOutput.appendLine(`WebTest execution failed: ${params.error?.message ?? "Unknown error"}`);
         if (params.error?.details) runOutput.appendLine(params.error.details);
         activeRunId = undefined;
@@ -184,6 +189,7 @@ export function activate(context: vscode.ExtensionContext): void {
       case "webtest.cancelled":
         webTestDebugSession.cancel();
         requestExplorer.refresh();
+        timingInspector.update(webTestDebugSession.requests, webTestDebugSession.status);
         runOutput.appendLine(`WebTest ${params.runId ?? activeRunId ?? ""} cancelled.`);
         activeRunId = undefined;
         void vscode.window.showInformationMessage("WebTest cancelled.");
@@ -285,6 +291,7 @@ export function activate(context: vscode.ExtensionContext): void {
         activeRunId = result.runId;
         webTestDebugSession.start(result.runId);
         requestExplorer.refresh();
+        timingInspector.update(webTestDebugSession.requests, webTestDebugSession.status);
         runOutput.appendLine(`WebTest accepted. Run ID: ${result.runId}`);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
@@ -292,6 +299,11 @@ export function activate(context: vscode.ExtensionContext): void {
         void vscode.window.showErrorMessage(`Unable to start WebTest: ${message}`);
       }
     }
+  );
+
+  const showTimingInspectorCommand = vscode.commands.registerCommand(
+    "deoloadtest.showTimingInspector",
+    () => timingInspector.show(webTestDebugSession.requests, webTestDebugSession.status)
   );
 
   const focusRequestExplorerCommand = vscode.commands.registerCommand(
@@ -334,6 +346,8 @@ export function activate(context: vscode.ExtensionContext): void {
     requestSelectionSubscription,
     requestExplorer,
     requestInspector,
+    timingInspector,
+    showTimingInspectorCommand,
     focusRequestExplorerCommand,
     communicationClient,
     hostManager,
