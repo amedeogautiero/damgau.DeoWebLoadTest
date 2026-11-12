@@ -416,6 +416,43 @@ export function activate(context: vscode.ExtensionContext): void {
     }
   );
 
+  const compileScriptCommand = vscode.commands.registerCommand(
+    "deoloadtest.compileScript",
+    async () => {
+      const editor = vscode.window.activeTextEditor;
+      if (!editor) {
+        void vscode.window.showErrorMessage("Open a .csx file before compiling.");
+        return;
+      }
+
+      const sourcePath = editor.document.uri.fsPath;
+      if (!sourcePath.toLowerCase().endsWith(".csx")) {
+        void vscode.window.showErrorMessage("The active file is not a .csx script.");
+        return;
+      }
+      if (!hostManager.isRunning || !communicationClient.isInitialized) {
+        void vscode.window.showErrorMessage(
+          "DeoLoadTest Host is not started and initialized. Run 'DeoLoadTest: Start Host' first."
+        );
+        return;
+      }
+
+      try {
+        await editor.document.save();
+        runOutput.show(true);
+        runOutput.appendLine(`Compiling C# script: ${sourcePath}`);
+        const result = await communicationClient.compileScript(sourcePath);
+        runOutput.appendLine(`Assembly: ${result.assemblyPath} (${result.assemblyBytes} bytes)`);
+        runOutput.appendLine(`Portable PDB: ${result.pdbPath} (${result.pdbBytes} bytes)`);
+        void vscode.window.showInformationMessage("C# script compiled successfully (DLL + Portable PDB).");
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        runOutput.appendLine(`Script compilation failed: ${message}`);
+        void vscode.window.showErrorMessage(`Script compilation failed: ${message}`);
+      }
+    }
+  );
+
   const stopHostCommand = vscode.commands.registerCommand(
     "deoloadtest.stopHost",
     async () => {
@@ -429,6 +466,7 @@ export function activate(context: vscode.ExtensionContext): void {
     startHostCommand,
     runLoadTestCommand,
     runWebTestCommand,
+    compileScriptCommand,
     stopWebTestCommand,
     importHarCommand,
     stopHostCommand,
