@@ -1,0 +1,36 @@
+{
+  "name": "deoloadtest",
+  "displayName": "DeoLoadTest",
+  "description": "Web load testing tools for Visual Studio Code.",
+  "version": "0.1.0",
+  "publisher": "damgau",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:deoloadtest.showWelcome"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "deoloadtest.showWelcome",
+        "title": "DeoLoadTest: Show Welcome"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.0",
+    "@types/vscode": "^1.90.0",
+    "typescript": "^5.7.2"
+  }
+}
