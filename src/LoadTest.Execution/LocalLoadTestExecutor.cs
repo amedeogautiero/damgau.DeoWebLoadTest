@@ -63,7 +63,7 @@ public static class LocalLoadTestExecutor
                     loadPlugins.Add((plugin, pluginReference.Params));
             }
 
-            var runId = Guid.NewGuid().ToString("N");
+            var runId = options.RunId ?? Guid.NewGuid().ToString("N");
             var name = !string.IsNullOrWhiteSpace(options.RunName)
                 ? options.RunName!
                 : !string.IsNullOrWhiteSpace(def.Name)
@@ -196,6 +196,7 @@ public sealed class LocalLoadTestOptions
     public string ResultsDatabasePath { get; init; } = "loadtest-results.db";
     public string? RunName { get; init; }
     public int? Seed { get; init; }
+    public string? RunId { get; init; }
     public Func<IHttpExecutor> HttpFactory { get; init; } = () => new HttpClientExecutor();
     public Action<RunProgressSnapshot>? OnProgress { get; init; }
     public Action<IntervalSnapshot>? OnInterval { get; init; }
