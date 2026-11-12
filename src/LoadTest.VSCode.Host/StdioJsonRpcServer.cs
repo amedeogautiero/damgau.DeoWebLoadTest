@@ -65,9 +65,11 @@ internal sealed class StdioJsonRpcServer(TextReader input, TextWriter output, Te
 
         ActiveRun? active;
         lock (_runGate)
+        {
             active = _activeRun;
+            active?.Cancellation.Cancel();
+        }
 
-        active?.Cancellation.Cancel();
         if (active is not null)
             await active.Task;
     }
