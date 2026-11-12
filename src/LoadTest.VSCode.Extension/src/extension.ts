@@ -38,7 +38,7 @@ export function activate(context: vscode.ExtensionContext): void {
   let activeRunId: string | undefined;
   const webTestDebugSession = new WebTestDebugSession();
   const requestExplorer = new WebTestRequestExplorer(webTestDebugSession);
-  const requestInspector = new WebTestRequestInspector(context.extensionUri);
+  const requestInspector = new WebTestRequestInspector();
   const requestExplorerView = vscode.window.createTreeView("deoloadtest.requestExplorer", {
     treeDataProvider: requestExplorer,
     showCollapseAll: false
@@ -100,6 +100,8 @@ export function activate(context: vscode.ExtensionContext): void {
         webTestDebugSession.applyExecutionEvent(event);
         if (event.eventType === "RequestStarted" || event.eventType === "RequestCompleted" || event.eventType === "RequestFailed") {
           requestExplorer.refresh();
+          const latestRequest = webTestDebugSession.requests[webTestDebugSession.requests.length - 1];
+          if (latestRequest) requestInspector.update(latestRequest);
         }
         if (event.eventType === "RequestCompleted" || event.eventType === "RequestFailed") {
           const success = event.eventType === "RequestCompleted";
