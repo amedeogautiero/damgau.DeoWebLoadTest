@@ -29,6 +29,7 @@ Response:
     "serverName":"LoadTest.VSCode.Host",
     "capabilities":{
       "localLoadTest":true,
+      "standaloneWebTest":true,
       "progressNotifications":true,
       "executionEvents":true,
       "cancellation":true,
@@ -61,7 +62,37 @@ Response:
 {"jsonrpc":"2.0","id":2,"result":{"runId":"<run-id>"}}
 ```
 
-Only one run can be active in this first version. A second start request returns error `-32001`.
+Only one local execution can be active in this first version. A second start request returns error `-32001`.
+
+### webtest.run
+
+Runs one `.webtest.yaml` directly through the shared `WebTestRunner`, without creating a temporary `.loadtest.yaml` file. This is a single-user, single-iteration execution intended for functional verification of a WebTest, not load generation.
+
+Parameters:
+- `webTestFile` (required): path to the `.webtest.yaml` file.
+- `debugMode` (optional, default `false`): forwards structured request and test events as `webtest.event` notifications.
+
+Request:
+
+```json
+{"jsonrpc":"2.0","id":4,"method":"webtest.run","params":{"webTestFile":"C:/tests/sample.webtest.yaml","debugMode":true}}
+```
+
+Response:
+
+```json
+{"jsonrpc":"2.0","id":4,"result":{"runId":"<run-id>"}}
+```
+
+The execution uses the WebTest's own defaults, context, steps and relative file paths. It uses one HTTP session and stops at the first failed step, following the normal `WebTestRunner` behavior.
+
+Notifications:
+- `webtest.event`: structured engine event, emitted only when `debugMode` is true.
+- `webtest.completed`: includes `success`, `failures`, `elapsedMs` and the number of started HTTP requests. A completed WebTest may have `success: false` when a request or validation fails.
+- `webtest.failed`: emitted when the Host cannot load or start the WebTest.
+- `webtest.cancelled`: emitted when cancellation is requested and observed.
+
+The same `run.cancel` method cancels either a load test or a standalone WebTest. Only one local execution of either kind may be active at a time.
 
 ### run.cancel
 

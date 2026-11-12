@@ -11,10 +11,13 @@
     "Other"
   ],
   "activationEvents": [
+    "onStartupFinished",
     "onCommand:deoloadtest.showWelcome",
     "onCommand:deoloadtest.startHost",
     "onCommand:deoloadtest.stopHost",
-    "onCommand:deoloadtest.runLoadTest"
+    "onCommand:deoloadtest.runLoadTest",
+    "onCommand:deoloadtest.runWebTest",
+    "onCommand:deoloadtest.importHar"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -34,12 +37,14 @@
       {
         "command": "deoloadtest.runLoadTest",
         "title": "DeoLoadTest: Run Load Test"
-      }
-    ],
-    "yamlValidation": [
+      },
       {
-        "fileMatch": "*.webtest.yaml",
-        "url": "./schemas/webtest.schema.json"
+        "command": "deoloadtest.runWebTest",
+        "title": "DeoLoadTest: Run WebTest"
+      },
+      {
+        "command": "deoloadtest.importHar",
+        "title": "DeoLoadTest: Import HAR"
       }
     ]
   },
@@ -53,7 +58,8 @@
     "@types/vscode": "^1.90.0",
     "typescript": "^5.7.2"
   },
-  "extensionDependencies": [
-    "redhat.vscode-yaml"
-  ]
+  "dependencies": {
+    "ajv": "^8.17.1",
+    "yaml": "^2.7.0"
+  }
 }

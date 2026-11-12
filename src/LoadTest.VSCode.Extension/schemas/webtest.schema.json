@@ -56,7 +56,8 @@
         "request": {
           "$ref": "#/definitions/pluginList"
         }
-      }
+      },
+      "additionalProperties": false
     },
     "steps": {
       "type": "array",
@@ -110,9 +111,10 @@
           ]
         },
         "headers": {
-          "$ref": "#/definitions/stringMap"
+          "$ref": "#/definitions/headerMap"
         }
-      }
+      },
+      "additionalProperties": false
     },
     "dataSource": {
       "type": "object",
@@ -154,9 +156,11 @@
             "query": {
               "type": "string"
             }
-          }
+          },
+          "additionalProperties": false
         }
-      }
+      },
+      "additionalProperties": false
     },
     "credential": {
       "type": "object",
@@ -175,7 +179,8 @@
         "password": {
           "type": "string"
         }
-      }
+      },
+      "additionalProperties": false
     },
     "clientCertificate": {
       "type": "object",
@@ -189,7 +194,8 @@
         "password": {
           "type": "string"
         }
-      }
+      },
+      "additionalProperties": false
     },
     "proxy": {
       "type": "object",
@@ -206,7 +212,8 @@
             "type": "string"
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     "pluginList": {
       "type": "array",
@@ -222,7 +229,8 @@
           "params": {
             "$ref": "#/definitions/stringMap"
           }
-        }
+        },
+        "additionalProperties": false
       }
     },
     "ruleLevel": {
@@ -311,7 +319,7 @@
           "type": "string"
         }
       },
-      "additionalProperties": true
+      "additionalProperties": false
     },
     "validateRule": {
       "type": "object",
@@ -382,7 +390,7 @@
           "type": "string"
         }
       },
-      "additionalProperties": true
+      "additionalProperties": false
     },
     "body": {
       "oneOf": [
@@ -473,7 +481,8 @@
                   "contentType": {
                     "type": "string"
                   }
-                }
+                },
+                "additionalProperties": false
               }
             }
           },
@@ -507,7 +516,7 @@
               "type": "string"
             },
             "headers": {
-              "$ref": "#/definitions/stringMap"
+              "$ref": "#/definitions/headerMap"
             },
             "body": {
               "$ref": "#/definitions/body"
@@ -519,7 +528,8 @@
                 "none"
               ]
             }
-          }
+          },
+          "additionalProperties": false
         },
         "thinkTimeMs": {
           "type": "integer",
@@ -542,7 +552,8 @@
         }
       },
       "title": "DeoLoadTest Request",
-      "description": "Singola richiesta HTTP."
+      "description": "Singola richiesta HTTP.",
+      "additionalProperties": false
     },
     "step": {
       "defaultSnippets": [
@@ -599,7 +610,8 @@
             }
           },
           "title": "DeoLoadTest Transaction",
-          "description": "Raggruppa più step in una transazione."
+          "description": "Raggruppa più step in una transazione.",
+          "additionalProperties": false
         },
         {
           "type": "object",
@@ -625,7 +637,8 @@
             }
           },
           "title": "DeoLoadTest If",
-          "description": "Esegue gli step in then o else in base a una condizione."
+          "description": "Esegue gli step in then o else in base a una condizione.",
+          "additionalProperties": false
         },
         {
           "type": "object",
@@ -646,7 +659,8 @@
                     "string"
                   ]
                 }
-              }
+              },
+              "additionalProperties": false
             },
             "steps": {
               "type": "array",
@@ -656,7 +670,8 @@
             }
           },
           "title": "DeoLoadTest Loop",
-          "description": "Ripete un gruppo di step."
+          "description": "Ripete un gruppo di step.",
+          "additionalProperties": false
         },
         {
           "type": "object",
@@ -672,7 +687,8 @@
             }
           },
           "title": "DeoLoadTest Call",
-          "description": "Richiama un altro file WebTest."
+          "description": "Richiama un altro file WebTest.",
+          "additionalProperties": false
         },
         {
           "type": "object",
@@ -685,9 +701,17 @@
             }
           },
           "title": "DeoLoadTest Code",
-          "description": "Esegue codice personalizzato."
+          "description": "Esegue codice personalizzato.",
+          "additionalProperties": false
         }
       ]
+    },
+    "headerMap": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
     }
-  }
+  },
+  "additionalProperties": false
 }

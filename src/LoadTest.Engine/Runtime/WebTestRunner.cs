@@ -167,7 +167,8 @@ public sealed class WebTestRunner(EngineServices services)
         foreach (var h in step.Headers) req.Headers[h.Key] = h.Value;
 
         ResponseContext? resp = null;
-        string? errorType = null, errorMessage = null;
+        string? errorType = null, errorMessage = null, exceptionDetails = null;
+        long requestElapsedMicros = 0;
         var failures = new List<string>();
 
         try
@@ -190,9 +191,11 @@ public sealed class WebTestRunner(EngineServices services)
                 RequestBody = req.Body
             });
 
+            var requestStopwatch = Stopwatch.StartNew();
             try { resp = await services.Http.SendAsync(req, ct); }
-            catch (TimeoutException ex) { errorType = "Timeout"; errorMessage = ex.Message; }
-            catch (HttpRequestException ex) { errorType = "Http"; errorMessage = ex.Message; }
+            catch (TimeoutException ex) { errorType = "Timeout"; errorMessage = ex.Message; exceptionDetails = FormatExceptionChain(ex); }
+            catch (HttpRequestException ex) { errorType = "Http"; errorMessage = ex.Message; exceptionDetails = FormatExceptionChain(ex); }
+            finally { requestStopwatch.Stop(); requestElapsedMicros = Micros(requestStopwatch); }
 
             if (resp is not null)
             {
@@ -209,6 +212,7 @@ public sealed class WebTestRunner(EngineServices services)
         {
             errorType = ex is UnresolvedVariableException ? "Binding" : "Exception";
             errorMessage = ex.Message;
+            exceptionDetails = FormatExceptionChain(ex);
         }
 
         var success = errorType is null;
@@ -233,9 +237,17 @@ public sealed class WebTestRunner(EngineServices services)
             ReasonPhrase = resp?.ReasonPhrase,
             ResponseHeaders = resp?.Headers,
             ResponseBody = resp?.BodyText,
-            ElapsedMicros = resp?.ElapsedMicros,
+            ElapsedMicros = resp?.ElapsedMicros ?? requestElapsedMicros,
             ErrorType = errorType,
             ErrorMessage = errorMessage,
+            ExceptionDetails = exceptionDetails,
+            RequestDefinition = new
+            {
+                method = step.Method,
+                url = step.Url,
+                headers = step.Headers,
+                body = step.Body
+            },
             Success = success
         });
 
@@ -356,6 +368,14 @@ public sealed class WebTestRunner(EngineServices services)
         if (Uri.TryCreate(url, UriKind.Absolute, out var abs) && (abs.Scheme is "http" or "https")) return url;
         if (string.IsNullOrEmpty(baseUrl)) throw new InvalidOperationException($"URL relativo '{url}' senza baseUrl");
         return baseUrl.TrimEnd('/') + "/" + url.TrimStart('/');
+    }
+
+    private static string FormatExceptionChain(Exception exception)
+    {
+        var lines = new List<string>();
+        for (var current = exception; current is not null; current = current.InnerException)
+            lines.Add($"{current.GetType().FullName}: {current.Message}");
+        return string.Join(Environment.NewLine + " ---> ", lines);
     }
 
     private static long Micros(Stopwatch sw) => sw.ElapsedTicks * 1_000_000L / Stopwatch.Frequency;
