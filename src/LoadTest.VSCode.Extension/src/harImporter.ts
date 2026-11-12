@@ -212,6 +212,20 @@ export async function importHarFile(): Promise<void> {
   const baseName = path.basename(harUri.fsPath, path.extname(harUri.fsPath));
   const outputUri = vscode.Uri.joinPath(workspaceFolder.uri, `${baseName}.webtest.yaml`);
 
+  try {
+    await vscode.workspace.fs.stat(outputUri);
+    const choice = await vscode.window.showWarningMessage(
+      `The file "${path.basename(outputUri.fsPath)}" already exists. Do you want to overwrite it?`,
+      { modal: true },
+      "Overwrite"
+    );
+    if (choice !== "Overwrite") return;
+  } catch (error) {
+    if (!(error instanceof vscode.FileSystemError) || error.code !== "FileNotFound") {
+      throw error;
+    }
+  }
+
   const yaml = toWebTestYaml(baseName, entries);
   await vscode.workspace.fs.writeFile(outputUri, Buffer.from(yaml, "utf8"));
 
