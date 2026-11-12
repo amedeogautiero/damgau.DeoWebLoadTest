@@ -5,6 +5,7 @@ import { importHarFile } from "./harImporter";
 import { registerWebTestValidator } from "./webTestValidator";
 import { WebTestDebugSession, WebTestExecutionEvent } from "./webTestDebugSession";
 import { WebTestRequestExplorer } from "./webTestRequestExplorer";
+import { WebTestRequestInspector } from "./webTestRequestInspector";
 
 interface RunNotificationParams {
   runId?: string;
@@ -37,9 +38,14 @@ export function activate(context: vscode.ExtensionContext): void {
   let activeRunId: string | undefined;
   const webTestDebugSession = new WebTestDebugSession();
   const requestExplorer = new WebTestRequestExplorer(webTestDebugSession);
+  const requestInspector = new WebTestRequestInspector(context.extensionUri);
   const requestExplorerView = vscode.window.createTreeView("deoloadtest.requestExplorer", {
     treeDataProvider: requestExplorer,
     showCollapseAll: false
+  });
+  const requestSelectionSubscription = requestExplorerView.onDidChangeSelection(({ selection }) => {
+    const selectedRequest = selection[0];
+    if (selectedRequest) requestInspector.show(selectedRequest);
   });
   let webTestRequestRows: string[] = [];
   let webTestFailureDetails: string[] = [];
@@ -323,7 +329,9 @@ export function activate(context: vscode.ExtensionContext): void {
     stopHostCommand,
     notificationSubscription,
     requestExplorerView,
+    requestSelectionSubscription,
     requestExplorer,
+    requestInspector,
     focusRequestExplorerCommand,
     communicationClient,
     hostManager,
