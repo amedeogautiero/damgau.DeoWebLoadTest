@@ -36,9 +36,9 @@ interface RunNotificationParams {
 
 export function activate(context: vscode.ExtensionContext): void {
   const hostManager = new HostManager(context.extensionUri.fsPath);
-  const hostDebugger = new HostDebugger(hostManager, runOutput);
   const communicationClient = new CommunicationClient(hostManager);
   const runOutput = vscode.window.createOutputChannel("DeoLoadTest Run");
+  const hostDebugger = new HostDebugger(hostManager, runOutput);
   registerWebTestValidator(context);
   let activeRunId: string | undefined;
   let activeWebTestRunId: string | undefined;
