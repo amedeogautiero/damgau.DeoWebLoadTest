@@ -95,7 +95,8 @@ public static class ScriptPackageCompiler
     /// `entry: &lt;nome&gt;.dll` e non elenca più i .csx. Restituisce il pacchetto in cache: il suo Sha256 è quello da mettere nel manifest di PrepareRun.
     /// </summary>
     public static PluginPackage Compile(PluginPackage source, PluginCache cache, IReadOnlyList<MetadataReference>? references = null,
-        string? signingPrivateKey = null, bool emitSymbols = false)
+        string? signingPrivateKey = null, bool emitSymbols = false,
+        IReadOnlyDictionary<string, string>? sourceDocumentPaths = null)
     {
         var m = source.Manifest;
         if (!m.IsScript) throw new ArgumentException("il pacchetto non ha un entry .csx", nameof(source));
@@ -104,8 +105,16 @@ public static class ScriptPackageCompiler
         csx.AddRange(m.Files.Where(f => f.EndsWith(".csx", StringComparison.OrdinalIgnoreCase)));
         var others = m.Files.Where(f => !f.EndsWith(".csx", StringComparison.OrdinalIgnoreCase)).ToList();
 
+        string SourceDocumentPath(string file)
+        {
+            if (!emitSymbols) return file.Replace('\\', '/');
+            if (sourceDocumentPaths is not null && sourceDocumentPaths.TryGetValue(file, out var originalPath))
+                return Path.GetFullPath(originalPath);
+            return Path.GetFullPath(Path.Combine(source.Directory, file.Replace('/', Path.DirectorySeparatorChar)));
+        }
+
         var sources = csx.Distinct().ToDictionary(
-            f => f.Replace('\\', '/'),
+            SourceDocumentPath,
             f => File.ReadAllText(Path.Combine(source.Directory, f.Replace('/', Path.DirectorySeparatorChar))));
 
         var asmName = SafeName(m.Name);
@@ -162,7 +171,10 @@ public static class ScriptPackageCompiler
                 Kinds = [PluginKind.CodedTest], Entry = file, Files = []
             };
             File.WriteAllText(Path.Combine(tmp, "plugin.yaml"), ManifestYaml(implicitManifest, file, []));
-            return Compile(PluginPackage.Open(tmp), cache, references, signingPrivateKey, emitSymbols);
+            var sourceDocumentPaths = emitSymbols
+                ? new Dictionary<string, string>(StringComparer.Ordinal) { [file] = Path.GetFullPath(csxPath) }
+                : null;
+            return Compile(PluginPackage.Open(tmp), cache, references, signingPrivateKey, emitSymbols, sourceDocumentPaths);
         }
         finally { Directory.Delete(tmp, true); }
     }
