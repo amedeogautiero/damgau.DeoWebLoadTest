@@ -3,7 +3,6 @@ import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
 
-const HOST_READY_MARKER = "DEOLOADTEST_HOST_READY";
 const HOST_START_TIMEOUT_MS = 30000;
 
 export class HostManager implements vscode.Disposable {
@@ -48,17 +47,10 @@ export class HostManager implements vscode.Disposable {
 
     this.process = child;
 
-    child.stdout?.on("data", (data: Buffer) => {
-      const chunk = data.toString();
-      for (const listener of this.stdoutListeners) {
-        listener(chunk);
-      }
-    });
-
     let resolveStartup!: () => void;
     let rejectStartup!: (error: Error) => void;
     let ready = false;
-    let stderrBuffer = "";
+    let stdoutBuffer = "";
 
     const startup = new Promise<void>((resolve, reject) => {
       resolveStartup = resolve;
@@ -69,26 +61,42 @@ export class HostManager implements vscode.Disposable {
     const timeout = setTimeout(() => {
       if (!ready) {
         rejectStartup(new Error(
-          `DeoLoadTest Host did not become ready within ${HOST_START_TIMEOUT_MS / 1000} seconds.`
+          `DeoLoadTest Host did not send the 'host.ready' notification within ${HOST_START_TIMEOUT_MS / 1000} seconds.`
         ));
       }
     }, HOST_START_TIMEOUT_MS);
 
-    child.stderr?.on("data", (data: Buffer) => {
+    child.stdout?.on("data", (data: Buffer) => {
       const chunk = data.toString();
-      this.output.append(chunk);
-      stderrBuffer += chunk;
 
-      if (!ready && stderrBuffer.includes(HOST_READY_MARKER)) {
-        ready = true;
-        clearTimeout(timeout);
-        resolveStartup();
+      for (const listener of this.stdoutListeners) {
+        listener(chunk);
       }
 
-      // Keep only a short tail in case the marker is split across chunks.
-      if (stderrBuffer.length > HOST_READY_MARKER.length * 2) {
-        stderrBuffer = stderrBuffer.slice(-HOST_READY_MARKER.length);
+      stdoutBuffer += chunk;
+      while (true) {
+        const newlineIndex = stdoutBuffer.indexOf("\\n");
+        if (newlineIndex < 0) break;
+
+        const line = stdoutBuffer.slice(0, newlineIndex).trim();
+        stdoutBuffer = stdoutBuffer.slice(newlineIndex + 1);
+        if (!line) continue;
+
+        try {
+          const message = JSON.parse(line) as { method?: string };
+          if (!ready && message.method === "host.ready") {
+            ready = true;
+            clearTimeout(timeout);
+            resolveStartup();
+          }
+        } catch {
+          // The communication client reports unexpected non-JSON output.
+        }
       }
+    });
+
+    child.stderr?.on("data", (data: Buffer) => {
+      this.output.append(data.toString());
     });
 
     child.on("error", (error) => {
@@ -111,7 +119,7 @@ export class HostManager implements vscode.Disposable {
       if (this.process === child) this.process = undefined;
     });
 
-    this.output.appendLine("Host process launched; waiting for readiness...");
+    this.output.appendLine("Host process launched; waiting for JSON-RPC readiness...");
 
     try {
       await startup;
@@ -129,7 +137,7 @@ export class HostManager implements vscode.Disposable {
       throw new Error("DeoLoadTest Host is not running or its input stream is unavailable.");
     }
 
-    child.stdin.write(`${JSON.stringify(message)}\n`);
+    child.stdin.write(`${JSON.stringify(message)}\\n`);
   }
 
   onStdout(listener: (chunk: string) => void): vscode.Disposable {

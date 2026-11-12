@@ -49,6 +49,13 @@ internal sealed class StdioJsonRpcServer(TextReader input, TextWriter output, Te
 
     public async Task RunAsync(CancellationToken cancellationToken = default)
     {
+        // Announce readiness through JSON-RPC as soon as the server loop starts.
+        WriteNotification("host.ready", new
+        {
+            protocolVersion = "1.0",
+            serverName = "LoadTest.VSCode.Host"
+        });
+
         while (await input.ReadLineAsync(cancellationToken) is { } line)
         {
             if (string.IsNullOrWhiteSpace(line))
