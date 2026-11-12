@@ -382,9 +382,10 @@ internal sealed class StdioJsonRpcServer(TextReader input, TextWriter output, Te
 
         var assemblyPath = Path.Combine(outputDirectory, assemblyName + ".dll");
         var pdbPath = Path.Combine(outputDirectory, assemblyName + ".pdb");
+        var pdb = compiled.Pdb
+            ?? throw new InvalidOperationException("Roslyn non ha prodotto il Portable PDB richiesto.");
         File.WriteAllBytes(assemblyPath, compiled.Assembly);
-        File.WriteAllBytes(pdbPath, compiled.Pdb
-            ?? throw new InvalidOperationException("Roslyn non ha prodotto il Portable PDB richiesto."));
+        File.WriteAllBytes(pdbPath, pdb);
 
         return new
         {
@@ -393,7 +394,7 @@ internal sealed class StdioJsonRpcServer(TextReader input, TextWriter output, Te
             assemblyPath,
             pdbPath,
             assemblyBytes = compiled.Assembly.Length,
-            pdbBytes = compiled.Pdb.Length
+            pdbBytes = pdb.Length
         };
     }
 
