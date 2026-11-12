@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { CommunicationClient, HostNotification } from "./communicationClient";
 import { HostManager } from "./hostManager";
+import { importHarFile } from "./harImporter";
 
 interface RunNotificationParams {
   runId?: string;
@@ -133,6 +134,18 @@ export function activate(context: vscode.ExtensionContext): void {
     }
   );
 
+  const importHarCommand = vscode.commands.registerCommand(
+    "deoloadtest.importHar",
+    async () => {
+      try {
+        await importHarFile();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        void vscode.window.showErrorMessage(`Unable to import HAR: ${message}`);
+      }
+    }
+  );
+
   const stopHostCommand = vscode.commands.registerCommand(
     "deoloadtest.stopHost",
     async () => {
@@ -145,6 +158,7 @@ export function activate(context: vscode.ExtensionContext): void {
     showWelcomeCommand,
     startHostCommand,
     runLoadTestCommand,
+    importHarCommand,
     stopHostCommand,
     notificationSubscription,
     communicationClient,
