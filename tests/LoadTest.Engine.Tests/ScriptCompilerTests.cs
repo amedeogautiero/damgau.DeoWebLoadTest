@@ -36,8 +36,8 @@ public class ScriptCompilerTests
     [Fact]
     public void CompileWithSymbols_emits_portable_pdb()
     {
-        var sourcePath = Path.GetFullPath(Path.Combine(
-            Directory.CreateTempSubdirectory("csx-pdb").FullName, "DebugScript.csx"));
+        using var temp = Directory.CreateTempSubdirectory("csx-pdb");
+        var sourcePath = Path.GetFullPath(Path.Combine(temp.FullName, "DebugScript.csx"));
         const string code = """
             public sealed class DebugScript : ICodedTest
             {
@@ -57,7 +57,7 @@ public class ScriptCompilerTests
         Assert.NotEmpty(result.Assembly);
         Assert.NotNull(result.Pdb);
         Assert.NotEmpty(result.Pdb!);
-        Assert.Equal("BSJB", Encoding.ASCII.GetString(result.Pdb!, 0, 4));
+        Assert.Equal("BSJB", System.Text.Encoding.ASCII.GetString(result.Pdb!, 0, 4));
     }
 
     [Fact]
