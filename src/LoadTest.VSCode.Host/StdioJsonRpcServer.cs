@@ -3,6 +3,8 @@ using System.Text.Json.Serialization;
 using LoadTest.Engine.Http;
 using LoadTest.Execution;
 using LoadTest.Engine.Runtime;
+using LoadTest.Engine.Model;
+using LoadTest.Sdk;
 
 namespace LoadTest.VSCode.Host;
 
@@ -27,6 +29,14 @@ internal sealed class StdioJsonRpcServer(TextReader input, TextWriter output, Te
         public string? ResultsDatabasePath { get; set; }
         public string? RunName { get; set; }
         public int? Seed { get; set; }
+        public bool DebugMode { get; set; }
+    }
+
+    private sealed class RunWebTestParams
+    {
+        public RunWebTestParams() { }
+
+        public string WebTestFile { get; set; } = "";
         public bool DebugMode { get; set; }
     }
 
@@ -125,6 +135,7 @@ internal sealed class StdioJsonRpcServer(TextReader input, TextWriter output, Te
                         capabilities = new
                         {
                             localLoadTest = true,
+                            standaloneWebTest = true,
                             progressNotifications = true,
                             executionEvents = true,
                             cancellation = true,
@@ -146,6 +157,22 @@ internal sealed class StdioJsonRpcServer(TextReader input, TextWriter output, Te
                     var active = ReserveRun();
                     WriteResult(id, new { runId = active.RunId });
                     LaunchRun(active, request);
+                    break;
+                }
+
+                case "webtest.run":
+                {
+                    var request = parameters.ValueKind == JsonValueKind.Undefined
+                        ? new RunWebTestParams()
+                        : JsonSerializer.Deserialize<RunWebTestParams>(parameters.GetRawText(), JsonOptions)
+                            ?? throw new RpcException(-32602, "Invalid params");
+
+                    if (string.IsNullOrWhiteSpace(request.WebTestFile))
+                        throw new RpcException(-32602, "webTestFile is required");
+
+                    var active = ReserveRun();
+                    WriteResult(id, new { runId = active.RunId });
+                    LaunchWebTest(active, request);
                     break;
                 }
 
@@ -190,7 +217,7 @@ internal sealed class StdioJsonRpcServer(TextReader input, TextWriter output, Te
         lock (_runGate)
         {
             if (_activeRun is not null)
-                throw new RpcException(-32001, "A local load test is already running.");
+                throw new RpcException(-32001, "A local execution is already running.");
 
             var active = new ActiveRun(Guid.NewGuid().ToString("N"));
             _activeRun = active;
@@ -201,6 +228,106 @@ internal sealed class StdioJsonRpcServer(TextReader input, TextWriter output, Te
     private void LaunchRun(ActiveRun active, StartRunParams request)
     {
         active.Task = Task.Run(() => ExecuteRunAsync(active, request));
+    }
+
+    private void LaunchWebTest(ActiveRun active, RunWebTestParams request)
+    {
+        active.Task = Task.Run(() => ExecuteWebTestAsync(active, request));
+    }
+
+    private async Task ExecuteWebTestAsync(ActiveRun active, RunWebTestParams request)
+    {
+        try
+        {
+            var path = Path.GetFullPath(request.WebTestFile);
+            if (!File.Exists(path))
+                throw new FileNotFoundException($"WebTest file not found: {path}", path);
+
+            var definition = WebTestLoader.LoadFile(path);
+            using var http = new HttpClientExecutor();
+            var requestCount = 0;
+            var runner = new WebTestRunner(new EngineServices
+            {
+                Http = http,
+                ValidationLevel = ValidationLevel.High,
+                OnExecutionEvent = executionEvent =>
+                {
+                    if (executionEvent.EventType == "RequestStarted")
+                        Interlocked.Increment(ref requestCount);
+
+                    if (executionEvent.EventType is "RequestCompleted" or "RequestFailed")
+                    {
+                        WriteNotification("webtest.event", new
+                        {
+                            runId = active.RunId,
+                            @event = executionEvent
+                        });
+                    }
+                }
+            });
+
+            var testName = string.IsNullOrWhiteSpace(definition.Name)
+                ? Path.GetFileName(path)
+                : definition.Name;
+            var user = new UserContext
+            {
+                UserId = 1,
+                UserContextId = Guid.NewGuid().ToString("N"),
+                AgentId = "local",
+                AgentName = "local",
+                ControllerName = "vscode",
+                ScenarioName = "VS Code",
+                IsNewUser = true
+            };
+            var context = new WebTestContext
+            {
+                TestName = testName,
+                User = user,
+                Iteration = 0,
+                CancellationToken = active.Cancellation.Token
+            };
+
+            var result = await runner.RunAsync(definition, context, active.Cancellation.Token);
+            WriteNotification("webtest.completed", new
+            {
+                runId = active.RunId,
+                result = new
+                {
+                    success = result.Success,
+                    failures = result.Failures,
+                    elapsedMs = result.Elapsed.TotalMilliseconds,
+                    requests = Volatile.Read(ref requestCount)
+                }
+            });
+        }
+        catch (OperationCanceledException) when (active.Cancellation.IsCancellationRequested)
+        {
+            WriteNotification("webtest.cancelled", new { runId = active.RunId });
+        }
+        catch (Exception ex)
+        {
+            WriteNotification("webtest.failed", new
+            {
+                runId = active.RunId,
+                error = new
+                {
+                    code = "webtest_execution_failed",
+                    message = ex.Message,
+                    details = ex.InnerException?.Message
+                }
+            });
+            error.WriteLine($"webtest {active.RunId} failed: {ex}");
+        }
+        finally
+        {
+            lock (_runGate)
+            {
+                if (ReferenceEquals(_activeRun, active))
+                    _activeRun = null;
+            }
+
+            active.Cancellation.Dispose();
+        }
     }
 
     private void CancelRun(string runId)
