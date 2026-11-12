@@ -34,6 +34,33 @@ public class ScriptCompilerTests
     private static PluginCache NewCache() => new(Directory.CreateTempSubdirectory("cache").FullName);
 
     [Fact]
+    public void CompileWithSymbols_emits_portable_pdb()
+    {
+        var sourcePath = Path.GetFullPath(Path.Combine(
+            Directory.CreateTempSubdirectory("csx-pdb").FullName, "DebugScript.csx"));
+        const string code = """
+            public sealed class DebugScript : ICodedTest
+            {
+                public Task RunAsync(TestContext ctx)
+                {
+                    var value = 42;
+                    ctx.Set("value", value.ToString());
+                    return Task.CompletedTask;
+                }
+            }
+            """;
+
+        var result = ScriptCompiler.CompileWithSymbols(
+            "DebugScript",
+            new Dictionary<string, string> { [sourcePath] = code });
+
+        Assert.NotEmpty(result.Assembly);
+        Assert.NotNull(result.Pdb);
+        Assert.NotEmpty(result.Pdb!);
+        Assert.Equal("BSJB", Encoding.ASCII.GetString(result.Pdb!, 0, 4));
+    }
+
+    [Fact]
     public void Compiles_class_only_script_and_loads_it()
     {
         var compiled = ScriptPackageCompiler.Compile(NewPackage(EchoRule), NewCache());
