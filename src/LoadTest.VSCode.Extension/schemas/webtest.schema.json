@@ -192,7 +192,7 @@
         {
           "label": "If",
           "description": "Conditional execution",
-          "body": "- if: \${condition}\n  then:\n    - name: request\n      request:\n        method: GET\n        url: https://example.com/"
+          "body": "- if: ${condition}\n  then:\n    - name: request\n      request:\n        method: GET\n        url: https://example.com/"
         },
         {
           "label": "Loop",
