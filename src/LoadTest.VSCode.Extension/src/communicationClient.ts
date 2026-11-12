@@ -31,6 +31,7 @@ interface RunStartResult {
 export class CommunicationClient implements vscode.Disposable {
   private nextRequestId = 1;
   private buffer = "";
+  private initialized = false;
   private readonly pending = new Map<
     number,
     { resolve: (value: unknown) => void; reject: (error: Error) => void; timer: NodeJS.Timeout }
@@ -43,8 +44,18 @@ export class CommunicationClient implements vscode.Disposable {
     this.stdoutSubscription = this.host.onStdout((chunk) => this.handleStdout(chunk));
   }
 
+  get isInitialized(): boolean {
+    return this.initialized;
+  }
+
+  resetInitialization(): void {
+    this.initialized = false;
+  }
+
   async initialize(): Promise<InitializeResult> {
+    this.initialized = false;
     const result = await this.request<InitializeResult>("initialize", {});
+    this.initialized = true;
     this.output.appendLine(
       `Connected to ${result.serverName}; protocol version ${result.protocolVersion}.`
     );
