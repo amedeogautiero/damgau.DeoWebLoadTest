@@ -11,7 +11,9 @@
     "Other"
   ],
   "activationEvents": [
-    "onCommand:deoloadtest.showWelcome"
+    "onCommand:deoloadtest.showWelcome",
+    "onCommand:deoloadtest.startHost",
+    "onCommand:deoloadtest.stopHost"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -19,6 +21,14 @@
       {
         "command": "deoloadtest.showWelcome",
         "title": "DeoLoadTest: Show Welcome"
+      },
+      {
+        "command": "deoloadtest.startHost",
+        "title": "DeoLoadTest: Start Host"
+      },
+      {
+        "command": "deoloadtest.stopHost",
+        "title": "DeoLoadTest: Stop Host"
       }
     ]
   },
