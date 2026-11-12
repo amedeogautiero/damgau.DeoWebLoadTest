@@ -121,7 +121,14 @@
           "group": "navigation"
         }
       ]
-    }
+    },
+    "keybindings": [
+      {
+        "command": "deoloadtest.runWebTest",
+        "key": "f5",
+        "when": "editorTextFocus && resourceExtname == .csx && !deoloadtest.webTestRunning"
+      }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
@@ -136,5 +143,8 @@
   "dependencies": {
     "ajv": "^8.17.1",
     "yaml": "^2.7.0"
-  }
+  },
+  "extensionDependencies": [
+    "ms-dotnettools.csharp"
+  ]
 }
