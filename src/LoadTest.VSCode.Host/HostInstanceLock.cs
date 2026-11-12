@@ -93,11 +93,19 @@ internal sealed class HostInstanceLock : IDisposable
 
     private static HostInstanceLock AcquireUnixFileLock()
     {
-        var lockPath = Path.Combine(Path.GetTempPath(), "deoloadtest-vscode-host.lock");
+        var lockPath = "/tmp/deoloadtest-vscode-host.lock";
 
         try
         {
-            var stream = new FileStream(lockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+            var stream = new FileStream(lockPath, new FileStreamOptions
+            {
+                Mode = FileMode.OpenOrCreate,
+                Access = FileAccess.ReadWrite,
+                Share = FileShare.None,
+                UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite |
+                    UnixFileMode.GroupRead | UnixFileMode.GroupWrite |
+                    UnixFileMode.OtherRead | UnixFileMode.OtherWrite
+            });
             try
             {
                 // Permit another local account to open the shared lock file. The
