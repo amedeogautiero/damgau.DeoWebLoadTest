@@ -24,7 +24,7 @@ public sealed class PluginWiring
     public required Func<string, ILoadProfile?> CustomProfileResolver { get; init; }
     public IReadOnlyList<string> Warnings { get; init; } = [];
 
-    /// <param name="compileSingleScript">Solo controller: percorso .csx → pacchetto compilato (per i passi `code:`).</param>
+    /// <param name="compileSingleScript">Percorso .csx → pacchetto compilato nel processo che prepara l'esecuzione (Controller o VS Code Host).</param>
     public static PluginWiring Build(PluginHost host, IEnumerable<WebTestDefinition> tests,
         LoadTestDefinition? loadTest = null, Func<string, PluginPackage>? compileSingleScript = null)
     {
