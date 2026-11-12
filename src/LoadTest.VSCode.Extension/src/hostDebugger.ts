@@ -4,21 +4,23 @@ import { HostManager } from "./hostManager";
 const DEBUG_SESSION_NAME = "DeoLoadTest Host";
 
 export class HostDebugger implements vscode.Disposable {
-  private attached = false;
+  private attachedProcessId: number | undefined;
   private starting: Promise<void> | undefined;
 
   private readonly startSubscription = vscode.debug.onDidStartDebugSession(session => {
-    if (session.name === DEBUG_SESSION_NAME) this.attached = true;
+    if (session.name === DEBUG_SESSION_NAME) {
+      this.attachedProcessId = Number(session.configuration.processId);
+    }
   });
 
   private readonly endSubscription = vscode.debug.onDidTerminateDebugSession(session => {
-    if (session.name === DEBUG_SESSION_NAME) this.attached = false;
+    if (session.name === DEBUG_SESSION_NAME) this.attachedProcessId = undefined;
   });
 
   constructor(private readonly host: HostManager) {}
 
   async attach(): Promise<void> {
-    if (this.attached) return;
+    if (this.host.processId && this.attachedProcessId === this.host.processId) return;
     if (this.starting) return this.starting;
 
     this.starting = this.attachCore();
@@ -58,7 +60,7 @@ export class HostDebugger implements vscode.Disposable {
       );
     }
 
-    this.attached = true;
+    this.attachedProcessId = processId;
   }
 
   dispose(): void {
