@@ -75,7 +75,7 @@ export class HostManager implements vscode.Disposable {
 
       stdoutBuffer += chunk;
       while (true) {
-        const newlineIndex = stdoutBuffer.indexOf("\\n");
+        const newlineIndex = stdoutBuffer.indexOf("\n");
         if (newlineIndex < 0) break;
 
         const line = stdoutBuffer.slice(0, newlineIndex).trim();
@@ -137,7 +137,7 @@ export class HostManager implements vscode.Disposable {
       throw new Error("DeoLoadTest Host is not running or its input stream is unavailable.");
     }
 
-    child.stdin.write(`${JSON.stringify(message)}\\n`);
+    child.stdin.write(`${JSON.stringify(message)}\n`);
   }
 
   onStdout(listener: (chunk: string) => void): vscode.Disposable {
