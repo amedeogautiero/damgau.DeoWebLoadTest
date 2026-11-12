@@ -67,7 +67,6 @@ export class WebTestDebugPanelVertical implements vscode.Disposable {
 
     const requests = this.session.requests;
     const resetRequests = force || (requests.length === 0 && this.sentRequests.size > 0);
-    const removedRequestIds: number[] = [];
 
     if (resetRequests) {
       this.sentRequests.clear();
@@ -120,7 +119,8 @@ export class WebTestDebugPanelVertical implements vscode.Disposable {
       runId: this.session.runId ?? "—",
       startedAt: this.session.startedAt ?? "—",
       finishedAt: this.session.finishedAt ?? (this.session.status === "running" ? "In progress" : "—"),
-      totalRequests: this.session.totalRequests,\n      visibleRequests: requests.length,
+      totalRequests: this.session.totalRequests,
+      visibleRequests: requests.length,
       successfulRequests: succeeded,
       failedRequests: failed,
       successRate: completed ? succeeded / completed * 100 : 0,
@@ -131,7 +131,6 @@ export class WebTestDebugPanelVertical implements vscode.Disposable {
       maxMs: durations.length ? Math.max(...durations) : null,
       failures: this.session.summary?.failures ?? [],
       requests: changedRequests,
-      removedRequestIds,
       resetRequests,
       ...(selectedChanged ? { selectedRequest } : {})
     });
