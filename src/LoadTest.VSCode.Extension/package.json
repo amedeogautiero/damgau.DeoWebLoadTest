@@ -11,6 +11,7 @@
     "Other"
   ],
   "activationEvents": [
+    "onStartupFinished",
     "onCommand:deoloadtest.showWelcome",
     "onCommand:deoloadtest.startHost",
     "onCommand:deoloadtest.stopHost",
