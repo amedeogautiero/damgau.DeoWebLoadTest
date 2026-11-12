@@ -25,6 +25,8 @@ public sealed record ExecutionEvent
     public string? ExceptionDetails { get; init; }
     /// <summary>Nodo request originale del passo WebTest, prima del binding delle variabili.</summary>
     public object? RequestDefinition { get; init; }
+    /// <summary>Snapshot del contesto all'avvio del WebTest, senza cronologia/provenienza delle variabili.</summary>
+    public object? ContextSnapshot { get; init; }
     public string? VariableName { get; init; }
     public string? VariableValue { get; init; }
     public bool? Success { get; init; }
