@@ -41,14 +41,18 @@ export function activate(context: vscode.ExtensionContext): void {
         break;
       }
       case "run.completed":
-        runOutput.appendLine(
-          `Run ${params.runId ?? activeRunId ?? ""} completed. Engine status: ${params.result?.run?.status ?? "unknown"}.`
-        );
         if (params.result?.summary) {
           runOutput.appendLine(`Summary: ${JSON.stringify(params.result.summary)}`);
         }
+        runOutput.appendLine(
+          `Run ${params.runId ?? activeRunId ?? ""} completed. Engine status: ${params.result?.run?.status ?? "unknown"}.`
+        );
         activeRunId = undefined;
-        void vscode.window.showInformationMessage("DeoLoadTest run completed.");
+        void vscode.window.showInformationMessage(
+          "DeoLoadTest run completed.",
+          { modal: true },
+          "OK"
+        );
         break;
       case "run.failed":
         runOutput.appendLine(
