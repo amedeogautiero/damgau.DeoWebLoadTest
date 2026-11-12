@@ -14,7 +14,8 @@
     "onCommand:deoloadtest.showWelcome",
     "onCommand:deoloadtest.startHost",
     "onCommand:deoloadtest.stopHost",
-    "onCommand:deoloadtest.runLoadTest"
+    "onCommand:deoloadtest.runLoadTest",
+    "onCommand:deoloadtest.importHar"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -34,6 +35,10 @@
       {
         "command": "deoloadtest.runLoadTest",
         "title": "DeoLoadTest: Run Load Test"
+      },
+      {
+        "command": "deoloadtest.importHar",
+        "title": "DeoLoadTest: Import HAR"
       }
     ],
     "yamlValidation": [
