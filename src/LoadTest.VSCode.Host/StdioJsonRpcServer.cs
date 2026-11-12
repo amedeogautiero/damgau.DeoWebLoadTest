@@ -20,6 +20,8 @@ internal sealed class StdioJsonRpcServer(TextReader input, TextWriter output, Te
 
     private sealed class StartRunParams
     {
+        public StartRunParams() { }
+
         public string LoadTestFile { get; set; } = "";
         public string? ResultsDatabasePath { get; set; }
         public string? RunName { get; set; }
@@ -28,6 +30,8 @@ internal sealed class StdioJsonRpcServer(TextReader input, TextWriter output, Te
 
     private sealed class CancelRunParams
     {
+        public CancelRunParams() { }
+
         public string RunId { get; set; } = "";
     }
 
