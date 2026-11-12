@@ -6,5 +6,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\LoadTest.Execution\LoadTest.Execution.csproj" />
+    <ProjectReference Include="..\LoadTest.Plugins.Compilation\LoadTest.Plugins.Compilation.csproj" />
   </ItemGroup>
 </Project>
