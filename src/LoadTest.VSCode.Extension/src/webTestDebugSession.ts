@@ -67,26 +67,33 @@ export class WebTestDebugSession {
   private currentContext: WebTestContextSnapshot | undefined;
   private currentSummary: DebugSessionSummary | undefined;
   private currentRunId: string | undefined;
+  private currentTestName: string | undefined;
   private currentStartedAt: string | undefined;
   private currentFinishedAt: string | undefined;
 
   get status(): DebugSessionStatus { return this.currentStatus; }
   get runId(): string | undefined { return this.currentRunId; }
+  get testName(): string | undefined { return this.currentTestName; }
   get startedAt(): string | undefined { return this.currentStartedAt; }
   get finishedAt(): string | undefined { return this.currentFinishedAt; }
   get requests(): readonly DebugRequest[] { return this.requestItems; }
   get context(): WebTestContextSnapshot | undefined { return this.currentContext; }
   get summary(): DebugSessionSummary | undefined { return this.currentSummary; }
 
-  start(runId: string, startedAt = new Date().toISOString()): void {
+  start(runId: string, startedAt = new Date().toISOString(), testName?: string): void {
     this.nextRequestId = 1;
     this.requestItems.length = 0;
     this.currentStatus = "running";
     this.currentRunId = runId;
+    this.currentTestName = testName;
     this.currentStartedAt = startedAt;
     this.currentFinishedAt = undefined;
     this.currentContext = undefined;
     this.currentSummary = undefined;
+  }
+
+  clearRequests(): void {
+    this.requestItems.length = 0;
   }
 
   applyExecutionEvent(event: WebTestExecutionEvent): void {
