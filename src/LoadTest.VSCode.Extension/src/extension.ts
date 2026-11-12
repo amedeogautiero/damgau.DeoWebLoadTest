@@ -47,7 +47,9 @@ export function activate(context: vscode.ExtensionContext): void {
   });
   const requestSelectionSubscription = requestExplorerView.onDidChangeSelection(({ selection }) => {
     const selectedRequest = selection[0];
-    if (selectedRequest) requestInspector.show(selectedRequest, webTestDebugSession.requests);
+    if (selectedRequest && selectedRequest.contextValue !== "deoloadtest.testHeader") {
+      requestInspector.show(selectedRequest as import("./webTestDebugSession").DebugRequest, webTestDebugSession.requests);
+    }
   });
   let webTestRequestRows: string[] = [];
   let webTestFailureDetails: string[] = [];
@@ -289,7 +291,8 @@ export function activate(context: vscode.ExtensionContext): void {
 
         const result = await communicationClient.startWebTest(selection[0].fsPath);
         activeRunId = result.runId;
-        webTestDebugSession.start(result.runId);
+        const testName = selection[0].fsPath.split(/[\\/]/).pop()?.replace(/\.webtest\.(yaml|yml)$/i, "") ?? selection[0].fsPath;
+        webTestDebugSession.start(result.runId, new Date().toISOString(), testName);
         requestExplorer.refresh();
         timingInspector.update(webTestDebugSession.requests, webTestDebugSession.status);
         runOutput.appendLine(`WebTest accepted. Run ID: ${result.runId}`);
@@ -298,6 +301,21 @@ export function activate(context: vscode.ExtensionContext): void {
         runOutput.appendLine(`Unable to start WebTest: ${message}`);
         void vscode.window.showErrorMessage(`Unable to start WebTest: ${message}`);
       }
+    }
+  );
+
+  const clearRequestExplorerCommand = vscode.commands.registerCommand(
+    "deoloadtest.clearRequestExplorer",
+    async () => {
+      if (webTestDebugSession.requests.length === 0) return;
+      const answer = await vscode.window.showWarningMessage(
+        "Clear all requests from the Request Explorer? The running WebTest will continue.",
+        { modal: true },
+        "Clear"
+      );
+      if (answer !== "Clear") return;
+      webTestDebugSession.clearRequests();
+      requestExplorer.refresh();
     }
   );
 
@@ -348,6 +366,7 @@ export function activate(context: vscode.ExtensionContext): void {
     requestInspector,
     timingInspector,
     showTimingInspectorCommand,
+    clearRequestExplorerCommand,
     focusRequestExplorerCommand,
     communicationClient,
     hostManager,
