@@ -84,7 +84,7 @@ export class WebTestDebugPanel implements vscode.Disposable {
       return '<button class="request-row' + selectedClass + '" data-select="' + request.id + '">' +
         '<span class="request-main"><span class="request-id">#' + String(request.id).padStart(3, "0") + '</span>' +
         '<span class="method">' + this.escape(request.method ?? "HTTP") + '</span>' +
-        '<span class="request-url">' + this.escape(this.shortUrl(request.url)) + '</span></span>' +
+        '<span class="request-url">' + this.escape(this.shortUrl(request.url)) + '</span>' + this.timelineFor(request, requests) + '</span>' +
         '<span class="request-meta"><span class="' + requestClass + '">' + requestStatus + '</span>' +
         '<span>' + (duration === undefined ? "—" : this.ms(duration)) + '</span>' +
         '<span>+' + (offset === undefined ? "—" : this.ms(offset)) + '</span></span></button>';
@@ -202,6 +202,25 @@ export class WebTestDebugPanel implements vscode.Disposable {
     if (!value) return undefined;
     const parsed = Date.parse(value);
     return Number.isFinite(parsed) ? parsed : undefined;
+  }
+
+  private timelineFor(request: DebugRequest, requests: readonly DebugRequest[]): string {
+    const starts = requests.map(r => this.parseTime(r.startedAt)).filter((v): v is number => v !== undefined);
+    const first = starts.length ? Math.min(...starts) : undefined;
+    const current = this.parseTime(request.startedAt);
+    if (first === undefined || current === undefined) return '<span class="timeline-empty">··········</span>';
+    const maxEnd = Math.max(1, ...requests.map(r => {
+      const start = this.parseTime(r.startedAt);
+      if (start === undefined) return 0;
+      const duration = typeof r.elapsedMicros === "number" ? r.elapsedMicros / 1000 : r.status === "pending" ? Date.now() - start : 1;
+      return Math.max(0, start - first) + Math.max(1, duration);
+    }));
+    const offset = Math.max(0, current - first);
+    const duration = typeof request.elapsedMicros === "number" ? request.elapsedMicros / 1000 : request.status === "pending" ? Math.max(1, Date.now() - current) : 1;
+    const left = Math.min(99, offset / maxEnd * 100);
+    const width = Math.max(1, Math.min(100 - left, duration / maxEnd * 100));
+    const state = request.status === "failed" ? "failed" : request.status === "succeeded" ? "succeeded" : "pending";
+    return '<span class="timeline-track"><span class="timeline-bar ' + state + '" style="left:' + left.toFixed(2) + '%;width:' + width.toFixed(2) + '%"></span></span>';
   }
 
   private shortUrl(value?: string): string {
