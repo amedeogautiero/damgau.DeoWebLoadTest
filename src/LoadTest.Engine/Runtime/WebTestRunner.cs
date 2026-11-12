@@ -98,34 +98,36 @@ public sealed class WebTestRunner(EngineServices services)
             TestName = ctx.TestName,
             UserId = ctx.User.UserId,
             Iteration = ctx.Iteration,
-            ContextSnapshot = new
-            {
-                variables = new Dictionary<string, string>(ctx.Parameters, StringComparer.Ordinal),
-                dataRows = ctx.DataRows.ToDictionary(
-                    row => row.Key,
-                    row => row.Value.ToDictionary(value => value.Key, value => value.Value, StringComparer.Ordinal),
-                    StringComparer.Ordinal),
-                predefined = new
-                {
-                    UserId = ctx.User.UserId,
-                    TestName = ctx.TestName,
-                    ScenarioName = ctx.User.ScenarioName,
-                    WebTestIteration = ctx.Iteration,
-                    LoadTestUserContext = ctx.User.UserContextId
-                },
-                user = new
-                {
-                    userId = ctx.User.UserId,
-                    userContextId = ctx.User.UserContextId,
-                    agentId = ctx.User.AgentId,
-                    agentName = ctx.User.AgentName,
-                    controllerName = ctx.User.ControllerName,
-                    scenarioName = ctx.User.ScenarioName,
-                    isNewUser = ctx.User.IsNewUser
-                }
-            }
+            ContextSnapshot = CaptureContextSnapshot(ctx)
         });
     }
+
+    private static object CaptureContextSnapshot(WebTestContext ctx) => new
+    {
+        variables = new Dictionary<string, string>(ctx.Parameters, StringComparer.Ordinal),
+        dataRows = ctx.DataRows.ToDictionary(
+            row => row.Key,
+            row => row.Value.ToDictionary(value => value.Key, value => value.Value, StringComparer.Ordinal),
+            StringComparer.Ordinal),
+        predefined = new
+        {
+            UserId = ctx.User.UserId,
+            TestName = ctx.TestName,
+            ScenarioName = ctx.User.ScenarioName,
+            WebTestIteration = ctx.Iteration,
+            LoadTestUserContext = ctx.User.UserContextId
+        },
+        user = new
+        {
+            userId = ctx.User.UserId,
+            userContextId = ctx.User.UserContextId,
+            agentId = ctx.User.AgentId,
+            agentName = ctx.User.AgentName,
+            controllerName = ctx.User.ControllerName,
+            scenarioName = ctx.User.ScenarioName,
+            isNewUser = ctx.User.IsNewUser
+        }
+    };
 
     private async Task<bool> ExecuteTransactionAsync(TransactionStep t, Frame f, CancellationToken ct)
     {
@@ -228,7 +230,8 @@ public sealed class WebTestRunner(EngineServices services)
                 Method = req.Method,
                 Url = req.Url,
                 RequestHeaders = new Dictionary<string, string>(req.Headers, StringComparer.OrdinalIgnoreCase),
-                RequestBody = req.Body
+                RequestBody = req.Body,
+                ContextSnapshot = CaptureContextSnapshot(f.Ctx)
             });
 
             var requestStopwatch = Stopwatch.StartNew();
@@ -281,6 +284,7 @@ public sealed class WebTestRunner(EngineServices services)
             ErrorType = errorType,
             ErrorMessage = errorMessage,
             ExceptionDetails = exceptionDetails,
+            ContextSnapshot = CaptureContextSnapshot(f.Ctx),
             RequestDefinition = new
             {
                 method = step.Method,
