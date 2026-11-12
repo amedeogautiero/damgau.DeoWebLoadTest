@@ -172,9 +172,9 @@ export class WebTestRequestInspector implements vscode.Disposable {
         const hasNew = Object.prototype.hasOwnProperty.call(newMap, key);
         const oldValue = hasOld ? this.formatValue(oldMap[key]).text : undefined;
         const newValue = hasNew ? this.formatValue(newMap[key]).text : undefined;
-        const changed = !hasOld || !hasNew || oldValue !== newValue;
-        const state = !hasOld ? "Added" : !hasNew ? "Removed" : changed ? "Modified" : "Unchanged";
-        const css = !hasOld ? "change-added" : !hasNew ? "change-removed" : changed ? "change-modified" : "";
+        const changed = hasOld && hasNew && oldValue !== newValue;
+        const state = !before || !after ? "Pending" : !hasOld ? "Added" : !hasNew ? "Removed" : changed ? "Modified" : "Unchanged";
+        const css = !before || !after ? "" : !hasOld ? "change-added" : !hasNew ? "change-removed" : changed ? "change-modified" : "";
         return `<tr><td>${this.escapeHtml(key)}</td><td>${formatCell(hasOld ? oldMap[key] : undefined)}</td><td>${formatCell(hasNew ? newMap[key] : undefined)}</td><td class="${css}">${state}</td></tr>`;
       }).join("");
 
