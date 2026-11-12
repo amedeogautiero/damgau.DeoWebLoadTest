@@ -12,10 +12,20 @@ interface JsonRpcResponse<T> {
   };
 }
 
+export interface HostNotification {
+  jsonrpc: "2.0";
+  method: string;
+  params?: unknown;
+}
+
 interface InitializeResult {
   protocolVersion: string;
   serverName: string;
   capabilities: Record<string, boolean>;
+}
+
+interface RunStartResult {
+  runId: string;
 }
 
 export class CommunicationClient implements vscode.Disposable {
@@ -25,6 +35,7 @@ export class CommunicationClient implements vscode.Disposable {
     number,
     { resolve: (value: unknown) => void; reject: (error: Error) => void; timer: NodeJS.Timeout }
   >();
+  private readonly notificationListeners = new Set<(notification: HostNotification) => void>();
   private readonly stdoutSubscription: vscode.Disposable;
   private readonly output = vscode.window.createOutputChannel("DeoLoadTest Communication");
 
@@ -42,6 +53,17 @@ export class CommunicationClient implements vscode.Disposable {
     return result;
   }
 
+  async startRun(loadTestFile: string): Promise<RunStartResult> {
+    return this.request<RunStartResult>("run.start", { loadTestFile });
+  }
+
+  onNotification(listener: (notification: HostNotification) => void): vscode.Disposable {
+    this.notificationListeners.add(listener);
+    return {
+      dispose: () => this.notificationListeners.delete(listener)
+    };
+  }
+
   private request<T>(method: string, params: unknown): Promise<T> {
     const id = this.nextRequestId++;
 
@@ -49,7 +71,7 @@ export class CommunicationClient implements vscode.Disposable {
       const timer = setTimeout(() => {
         this.pending.delete(id);
         reject(new Error(`Timeout waiting for JSON-RPC response to '${method}'.`));
-      }, 5000);
+      }, 10000);
 
       this.pending.set(id, {
         resolve: (value) => resolve(value as T),
@@ -78,7 +100,7 @@ export class CommunicationClient implements vscode.Disposable {
       this.buffer = this.buffer.slice(newlineIndex + 1);
       if (!line) continue;
 
-      let message: JsonRpcResponse<unknown> | { jsonrpc: "2.0"; method: string; params?: unknown };
+      let message: JsonRpcResponse<unknown> | HostNotification;
       try {
         message = JSON.parse(line);
       } catch {
@@ -99,7 +121,9 @@ export class CommunicationClient implements vscode.Disposable {
           pending.resolve(message.result);
         }
       } else if ("method" in message) {
-        this.output.appendLine(`Host notification: ${message.method}`);
+        for (const listener of this.notificationListeners) {
+          listener(message);
+        }
       }
     }
   }
@@ -111,6 +135,7 @@ export class CommunicationClient implements vscode.Disposable {
       pending.reject(new Error("Communication client disposed."));
     }
     this.pending.clear();
+    this.notificationListeners.clear();
     this.output.dispose();
   }
 }
