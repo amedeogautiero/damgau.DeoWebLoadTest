@@ -23,7 +23,7 @@ interface RunNotificationParams {
     elapsedMs?: number;
     requests?: number;
   };
-  event?: { eventType?: string; requestName?: string; method?: string; url?: string; statusCode?: number; errorType?: string; errorMessage?: string; exceptionDetails?: string; elapsedMicros?: number; requestDefinition?: unknown };
+  event?: { eventType?: string; requestName?: string; method?: string; url?: string; statusCode?: number; reasonPhrase?: string; success?: boolean; errorType?: string; errorMessage?: string; exceptionDetails?: string; elapsedMicros?: number; requestDefinition?: unknown };
   error?: { code?: string; message?: string; details?: string };
 }
 
@@ -33,6 +33,10 @@ export function activate(context: vscode.ExtensionContext): void {
   const runOutput = vscode.window.createOutputChannel("DeoLoadTest Run");
   registerWebTestValidator(context);
   let activeRunId: string | undefined;
+  let webTestRequestRows: string[] = [];
+  let webTestFailureDetails: string[] = [];
+  let webTestSuccessfulRequests = 0;
+  let webTestFailedRequests = 0;
 
   const notificationSubscription = communicationClient.onNotification((notification) => {
     if (!notification.method.startsWith("run.") && !notification.method.startsWith("webtest.")) return;
@@ -79,35 +83,65 @@ export function activate(context: vscode.ExtensionContext): void {
         break;
       case "webtest.event": {
         const event = params.event ?? {};
-        if (event.eventType === "RequestFailed") {
-          runOutput.appendLine("");
-          runOutput.appendLine(`REQUEST FAILED: ${event.requestName ?? "Unnamed request"}`);
-          runOutput.appendLine(`  Method: ${event.method ?? "n/a"}`);
-          runOutput.appendLine(`  URL: ${event.url ?? "n/a"}`);
-          runOutput.appendLine(`  Type: ${event.errorType ?? "n/a"}`);
-          runOutput.appendLine(`  Error: ${event.errorMessage ?? "n/a"}`);
-          if (typeof event.elapsedMicros === "number") {
-            runOutput.appendLine(`  Duration: ${(event.elapsedMicros / 1000).toFixed(1)} ms`);
+        if (event.eventType === "RequestCompleted" || event.eventType === "RequestFailed") {
+          const success = event.eventType === "RequestCompleted";
+          if (success) webTestSuccessfulRequests++;
+          else webTestFailedRequests++;
+
+          const index = webTestSuccessfulRequests + webTestFailedRequests;
+          const method = (event.method ?? "???").toUpperCase().padEnd(7);
+          const url = event.url ?? "n/a";
+          const status = typeof event.statusCode === "number"
+            ? `${event.statusCode} ${event.reasonPhrase ?? (event.statusCode >= 400 ? "Error" : "OK")}`
+            : success ? "OK" : (event.errorType ?? "FAILED");
+          const duration = typeof event.elapsedMicros === "number"
+            ? `${(event.elapsedMicros / 1000).toFixed(1)} ms`
+            : "n/a";
+          webTestRequestRows.push(`${String(index).padStart(3, "0")} ${method} ${url}  ${status.padEnd(12)} ${duration}`);
+
+          if (!success) {
+            const details = [
+              "",
+              `REQUEST FAILED: Request ${index} - ${event.method ?? "n/a"}`,
+              `  URL: ${url}`,
+              `  Type: ${event.errorType ?? "n/a"}`,
+              `  Error: ${event.errorMessage ?? "n/a"}`,
+              `  Duration: ${duration}`
+            ];
+            if (event.exceptionDetails) {
+              details.push("  Exception chain:");
+              details.push(...event.exceptionDetails.split("\n").map(line => `    ${line}`));
+            }
+            if (event.requestDefinition !== undefined) {
+              details.push("  YAML request node (parsed):");
+              details.push(...JSON.stringify(event.requestDefinition, null, 2)
+                .split("\n").map(line => `    ${line}`));
+            }
+            webTestFailureDetails.push(details.join("\n"));
           }
-          if (event.exceptionDetails) {
-            runOutput.appendLine("  Exception chain:");
-            for (const line of event.exceptionDetails.split("\n")) runOutput.appendLine(`    ${line}`);
-          }
-          if (event.requestDefinition !== undefined) {
-            runOutput.appendLine("  YAML request node (parsed):");
-            runOutput.appendLine(JSON.stringify(event.requestDefinition, null, 2)
-              .split("\n").map(line => `    ${line}`).join("\n"));
-          }
-        } else if (event.eventType) {
+        } else if (event.eventType && event.eventType !== "RequestStarted") {
           runOutput.appendLine(`WebTest event: ${event.eventType} ${event.requestName ?? ""}`);
         }
         break;
       }
       case "webtest.completed": {
         const result = params.result ?? {};
-        runOutput.appendLine(
-          `WebTest ${result.success ? "succeeded" : "failed"}: ${result.requests ?? 0} requests, ${(result.elapsedMs ?? 0).toFixed(1)} ms.`
-        );
+        const total = webTestSuccessfulRequests + webTestFailedRequests;
+        runOutput.appendLine("");
+        runOutput.appendLine("Requests:");
+        webTestRequestRows.forEach((row, index) => {
+          const prefix = `[${String(index + 1).padStart(3, "0")}/${total}]`;
+          runOutput.appendLine(`${prefix} ${row.slice(4)}`);
+        });
+        for (const details of webTestFailureDetails) runOutput.appendLine(details);
+        runOutput.appendLine("");
+        runOutput.appendLine(`WebTest ${result.success ? "succeeded" : "failed"}.`);
+        runOutput.appendLine("");
+        runOutput.appendLine("Summary:");
+        runOutput.appendLine(`  Requests:       ${result.requests ?? total}`);
+        runOutput.appendLine(`  Successful:     ${webTestSuccessfulRequests}`);
+        runOutput.appendLine(`  Failed:         ${webTestFailedRequests}`);
+        runOutput.appendLine(`  Total duration: ${(result.elapsedMs ?? 0).toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} ms`);
         for (const failure of result.failures ?? []) runOutput.appendLine(`  ${failure}`);
         activeRunId = undefined;
         if (result.success) {
@@ -216,7 +250,12 @@ export function activate(context: vscode.ExtensionContext): void {
       try {
         runOutput.clear();
         runOutput.show(true);
+        webTestRequestRows = [];
+        webTestFailureDetails = [];
+        webTestSuccessfulRequests = 0;
+        webTestFailedRequests = 0;
         runOutput.appendLine(`Starting WebTest: ${selection[0].fsPath}`);
+        runOutput.appendLine("");
 
         const result = await communicationClient.startWebTest(selection[0].fsPath);
         activeRunId = result.runId;
