@@ -33,7 +33,8 @@ export function activate(context: vscode.ExtensionContext): void {
   const communicationClient = new CommunicationClient(hostManager);
   const runOutput = vscode.window.createOutputChannel("DeoLoadTest Run");
   registerWebTestValidator(context);
-  let activeRunId: string | undefined;\n  const webTestDebugSession = new WebTestDebugSession();
+  let activeRunId: string | undefined;
+  const webTestDebugSession = new WebTestDebugSession();
   let webTestRequestRows: string[] = [];
   let webTestFailureDetails: string[] = [];
   let webTestSuccessfulRequests = 0;
@@ -84,6 +85,7 @@ export function activate(context: vscode.ExtensionContext): void {
         break;
       case "webtest.event": {
         const event = params.event ?? {};
+        webTestDebugSession.applyExecutionEvent(event);
         if (event.eventType === "RequestCompleted" || event.eventType === "RequestFailed") {
           const success = event.eventType === "RequestCompleted";
           if (success) webTestSuccessfulRequests++;
@@ -125,6 +127,7 @@ export function activate(context: vscode.ExtensionContext): void {
       }
       case "webtest.completed": {
         const result = params.result ?? {};
+        webTestDebugSession.complete(result);
         const total = webTestSuccessfulRequests + webTestFailedRequests;
         runOutput.appendLine("");
         runOutput.appendLine("Requests:");
@@ -151,6 +154,7 @@ export function activate(context: vscode.ExtensionContext): void {
         break;
       }
       case "webtest.failed":
+        webTestDebugSession.fail();
         runOutput.appendLine(`WebTest execution failed: ${params.error?.message ?? "Unknown error"}`);
         if (params.error?.details) runOutput.appendLine(params.error.details);
         activeRunId = undefined;
@@ -159,6 +163,7 @@ export function activate(context: vscode.ExtensionContext): void {
         );
         break;
       case "webtest.cancelled":
+        webTestDebugSession.cancel();
         runOutput.appendLine(`WebTest ${params.runId ?? activeRunId ?? ""} cancelled.`);
         activeRunId = undefined;
         void vscode.window.showInformationMessage("WebTest cancelled.");
@@ -258,6 +263,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
         const result = await communicationClient.startWebTest(selection[0].fsPath);
         activeRunId = result.runId;
+        webTestDebugSession.start(result.runId);
         runOutput.appendLine(`WebTest accepted. Run ID: ${result.runId}`);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
