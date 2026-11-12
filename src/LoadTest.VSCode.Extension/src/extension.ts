@@ -116,10 +116,6 @@ export function activate(context: vscode.ExtensionContext): void {
           const latestRequest = webTestDebugSession.requests[webTestDebugSession.requests.length - 1];
           requestInspector.update(webTestDebugSession.requests);
           timingInspector.update(webTestDebugSession.requests, webTestDebugSession.status);
-        debugPanel.update();
-        debugPanel.update();
-        debugPanel.update();
-        debugPanel.update();
           debugPanel.update();
         }
         if (event.eventType === "RequestCompleted" || event.eventType === "RequestFailed") {
@@ -166,6 +162,7 @@ export function activate(context: vscode.ExtensionContext): void {
         webTestDebugSession.complete(result);
         requestExplorer.refresh();
         timingInspector.update(webTestDebugSession.requests, webTestDebugSession.status);
+        debugPanel.update();
         const total = webTestSuccessfulRequests + webTestFailedRequests;
         runOutput.appendLine("");
         runOutput.appendLine("Requests:");
