@@ -54,6 +54,8 @@ public sealed class EngineServices
     public IMeasurementSink Sink { get; init; } = NullMeasurementSink.Instance;
     /// <summary>Riceve eventi di dettaglio WebTest. Gli errori del consumer non interrompono l'esecuzione.</summary>
     public Action<ExecutionEvent>? OnExecutionEvent { get; init; }
+    /// <summary>Gestisce gli errori dei callback di osservazione senza interrompere l'esecuzione.</summary>
+    public Action<Exception>? OnPluginError { get; init; }
     public IThinkTimeProvider ThinkTime { get; init; } = new RecordedThinkTimeProvider();
     public RuleRegistry Rules { get; init; } = RuleRegistry.CreateDefault();
     public IReadOnlyList<IWebTestPlugin> WebTestPlugins { get; init; } = [];
