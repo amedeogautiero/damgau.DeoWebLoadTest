@@ -138,7 +138,7 @@ export function activate(context: vscode.ExtensionContext): void {
         runOutput.appendLine(`WebTest ${result.success ? "succeeded" : "failed"}.`);
         runOutput.appendLine("");
         runOutput.appendLine("Summary:");
-        runOutput.appendLine(`  Requests:       ${result.requests ?? total}`);
+        runOutput.appendLine(`  Requests:       ${total}`);
         runOutput.appendLine(`  Successful:     ${webTestSuccessfulRequests}`);
         runOutput.appendLine(`  Failed:         ${webTestFailedRequests}`);
         runOutput.appendLine(`  Total duration: ${(result.elapsedMs ?? 0).toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} ms`);
