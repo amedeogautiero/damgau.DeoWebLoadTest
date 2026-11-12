@@ -28,6 +28,15 @@ interface RunStartResult {
   runId: string;
 }
 
+export interface ScriptCompileResult {
+  sourcePath: string;
+  assemblyName: string;
+  assemblyPath: string;
+  pdbPath: string;
+  assemblyBytes: number;
+  pdbBytes: number;
+}
+
 export class CommunicationClient implements vscode.Disposable {
   private nextRequestId = 1;
   private buffer = "";
@@ -76,6 +85,14 @@ export class CommunicationClient implements vscode.Disposable {
     return this.request<{ accepted: boolean; runId: string }>("run.cancel", { runId });
   }
 
+  async compileScript(sourcePath: string, outputDirectory?: string): Promise<ScriptCompileResult> {
+    return this.request<ScriptCompileResult>(
+      "script.compile",
+      { sourcePath, outputDirectory },
+      120000
+    );
+  }
+
   onNotification(listener: (notification: HostNotification) => void): vscode.Disposable {
     this.notificationListeners.add(listener);
     return {
@@ -83,14 +100,14 @@ export class CommunicationClient implements vscode.Disposable {
     };
   }
 
-  private request<T>(method: string, params: unknown): Promise<T> {
+  private request<T>(method: string, params: unknown, timeoutMs = 10000): Promise<T> {
     const id = this.nextRequestId++;
 
     return new Promise<T>((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(id);
         reject(new Error(`Timeout waiting for JSON-RPC response to '${method}'.`));
-      }, 10000);
+      }, timeoutMs);
 
       this.pending.set(id, {
         resolve: (value) => resolve(value as T),
