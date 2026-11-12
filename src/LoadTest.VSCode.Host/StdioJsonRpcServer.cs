@@ -255,15 +255,13 @@ internal sealed class StdioJsonRpcServer(TextReader input, TextWriter output, Te
                     if (executionEvent.EventType == "RequestStarted")
                         Interlocked.Increment(ref requestCount);
 
-                    // Il WebTest standalone mostra sempre una riga per ogni richiesta.
-                    // DebugMode aggiunge gli altri eventi diagnostici.
-                    if (request.DebugMode ||
-                        executionEvent.EventType is "RequestCompleted" or "RequestFailed")
-                        WriteNotification("webtest.event", new
-                        {
-                            runId = active.RunId,
-                            @event = executionEvent
-                        });
+                    // Diagnostic pass: forward every engine event so the extension can
+                    // reveal the actual event names and payload shape emitted by WebTestRunner.
+                    WriteNotification("webtest.event", new
+                    {
+                        runId = active.RunId,
+                        @event = executionEvent
+                    });
                 }
             });
 
