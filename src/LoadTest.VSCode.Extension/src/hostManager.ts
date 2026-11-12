@@ -4,10 +4,12 @@ import * as path from "path";
 import * as vscode from "vscode";
 
 const HOST_START_TIMEOUT_MS = 30000;
+const HOST_STOP_TIMEOUT_MS = 5000;
 
 export class HostManager implements vscode.Disposable {
   private process: ChildProcess | undefined;
   private startup: Promise<void> | undefined;
+  private stopping: Promise<void> | undefined;
   private readonly output = vscode.window.createOutputChannel("DeoLoadTest Host");
   private readonly stdoutListeners = new Set<(chunk: string) => void>();
 
@@ -147,7 +149,7 @@ export class HostManager implements vscode.Disposable {
     };
   }
 
-  stop(): void {
+  async stop(): Promise<void> {
     const child = this.process;
     if (!child || child.exitCode !== null) {
       this.process = undefined;
@@ -155,16 +157,58 @@ export class HostManager implements vscode.Disposable {
       return;
     }
 
-    child.kill();
-    this.output.appendLine("Stop signal sent to DeoLoadTest Host.");
-    this.process = undefined;
-    void vscode.window.showInformationMessage("Stop signal sent to DeoLoadTest Host.");
+    await this.stopChild(child, "Stop requested");
+    void vscode.window.showInformationMessage("DeoLoadTest Host stopped.");
+  }
+
+  private stopChild(child: ChildProcess, reason: string): Promise<void> {
+    if (this.stopping) return this.stopping;
+
+    this.stopping = new Promise<void>((resolve) => {
+      if (child.exitCode !== null || child.killed) {
+        resolve();
+        return;
+      }
+
+      this.output.appendLine(`${reason}; requesting graceful Host shutdown...`);
+
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(forceKillTimer);
+        child.removeListener("exit", finish);
+        resolve();
+      };
+
+      child.once("exit", finish);
+
+      const forceKillTimer = setTimeout(() => {
+        if (child.exitCode === null) {
+          this.output.appendLine(
+            `Host did not stop within ${HOST_STOP_TIMEOUT_MS / 1000} seconds; forcing process termination.`
+          );
+          child.kill();
+        }
+        finish();
+      }, HOST_STOP_TIMEOUT_MS);
+
+      // EOF is the Host's graceful-shutdown signal. The Host cancels and awaits
+      // any active run before releasing its single-instance lock and exiting.
+      child.stdin?.end();
+    }).finally(() => {
+      this.stopping = undefined;
+      if (this.process === child && child.exitCode !== null)
+        this.process = undefined;
+    });
+
+    return this.stopping;
   }
 
   dispose(): void {
-    if (this.process && this.process.exitCode === null) {
-      this.process.kill();
-      this.process = undefined;
+    const child = this.process;
+    if (child && child.exitCode === null) {
+      void this.stopChild(child, "VS Code extension is being deactivated");
     }
 
     this.stdoutListeners.clear();
