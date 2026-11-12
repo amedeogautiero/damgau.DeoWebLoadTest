@@ -75,18 +75,20 @@ export class WebTestDebugPanelVertical implements vscode.Disposable {
       this.selectedRequestId = undefined;
     }
 
-    const changedRequests: DebugRequest[] = [];
+    const changedRequests: Array<{ slot: number; request: DebugRequest }> = [];
     if (force) {
-      for (const request of requests) {
-        changedRequests.push(request);
+      for (let index = 0; index < requests.length; index++) {
+        const request = requests[index];
+        changedRequests.push({ slot: index + 1, request });
         this.sentRequests.set(request.id, request);
       }
     } else if (changedRequestId !== undefined) {
-      const request = requests[requests.length - 1]?.id === changedRequestId
-        ? requests[requests.length - 1]
-        : requests.find(item => item.id === changedRequestId);
+      const requestIndex = requests[requests.length - 1]?.id === changedRequestId
+        ? requests.length - 1
+        : requests.findIndex(item => item.id === changedRequestId);
+      const request = requestIndex >= 0 ? requests[requestIndex] : undefined;
       if (request && this.sentRequests.get(request.id) !== request) {
-        changedRequests.push(request);
+        changedRequests.push({ slot: requestIndex + 1, request });
         this.sentRequests.set(request.id, request);
       }
     }
@@ -119,7 +121,7 @@ export class WebTestDebugPanelVertical implements vscode.Disposable {
       runId: this.session.runId ?? "—",
       startedAt: this.session.startedAt ?? "—",
       finishedAt: this.session.finishedAt ?? (this.session.status === "running" ? "In progress" : "—"),
-      totalRequests: this.session.totalRequests,
+      totalRequests: this.session.totalRequests,\n      visibleRequests: requests.length,
       successfulRequests: succeeded,
       failedRequests: failed,
       successRate: completed ? succeeded / completed * 100 : 0,
@@ -455,7 +457,7 @@ export class WebTestDebugPanelVertical implements vscode.Disposable {
       allocatedSlots = 0;
       ensureCapacity(0);
     } else {
-      ensureCapacity(message.totalRequests || 0);
+      ensureCapacity(message.visibleRequests || 0);
     }
     (message.removedRequestIds || []).forEach(id => {
       const row = rows.get(id);
@@ -464,7 +466,7 @@ export class WebTestDebugPanelVertical implements vscode.Disposable {
         rows.delete(id);
       }
     });
-    (message.requests || []).forEach(updateRow);
+    (message.requests || []).forEach(item => updateRow(item.request, item.slot));
     sessionStartedAt = message.startedAt === "—" ? null : message.startedAt;
     updateSummary(message);
     if (message.selectedRequest && (selectedRequestId === null || selectedRequestId === undefined)) {
