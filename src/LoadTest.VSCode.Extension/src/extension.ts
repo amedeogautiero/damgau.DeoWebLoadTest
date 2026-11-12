@@ -49,15 +49,15 @@ export function activate(context: vscode.ExtensionContext): void {
     webTestDebugSession,
     () => { void vscode.commands.executeCommand("deoloadtest.runWebTest"); },
     () => { void vscode.commands.executeCommand("deoloadtest.stopWebTest"); },
-    () => { void vscode.commands.executeCommand("deoloadtest.clearRequestExplorer"); },
-    () => { void vscode.commands.executeCommand("deoloadtest.startHost"); },
-    () => { void vscode.commands.executeCommand("deoloadtest.stopHost"); }
+    () => { void vscode.commands.executeCommand("deoloadtest.clearRequestExplorer"); }
   );
   const verticalDebugPanel = new WebTestDebugPanelVertical(
     webTestDebugSession,
     () => { void vscode.commands.executeCommand("deoloadtest.runWebTest"); },
     () => { void vscode.commands.executeCommand("deoloadtest.stopWebTest"); },
-    () => { void vscode.commands.executeCommand("deoloadtest.clearRequestExplorer"); }
+    () => { void vscode.commands.executeCommand("deoloadtest.clearRequestExplorer"); },
+    () => { void vscode.commands.executeCommand("deoloadtest.startHost"); },
+    () => { void vscode.commands.executeCommand("deoloadtest.stopHost"); }
   );
   const requestExplorerView = vscode.window.createTreeView("deoloadtest.requestExplorer", {
     treeDataProvider: requestExplorer,
