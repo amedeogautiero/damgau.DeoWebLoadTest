@@ -183,11 +183,6 @@ function toWebTestYaml(name: string, entries: HarEntry[]): string {
 }
 
 export async function importHarFile(): Promise<void> {
-  const workspace = vscode.workspace.workspaceFolders?.[0];
-  if (!workspace) {
-    throw new Error("Open a DeoLoadTest workspace before importing a HAR file.");
-  }
-
   const harSelection = await vscode.window.showOpenDialog({
     canSelectMany: false,
     openLabel: "Import HAR",
@@ -210,12 +205,13 @@ export async function importHarFile(): Promise<void> {
   }
 
   const baseName = path.basename(harUri.fsPath, path.extname(harUri.fsPath));
-  const webTestsDirectory = vscode.Uri.joinPath(workspace.uri, "webtests");
-  await vscode.workspace.fs.createDirectory(webTestsDirectory);
-
   const suggestedName = `${baseName}.webtest.yaml`;
+  // Importing a HAR must also work when VS Code has no workspace folder open.
+  // Suggest the generated WebTest beside the source HAR; the user can choose
+  // any other destination in the Save dialog.
+  const defaultOutputUri = vscode.Uri.file(path.join(path.dirname(harUri.fsPath), suggestedName));
   const outputUri = await vscode.window.showSaveDialog({
-    defaultUri: vscode.Uri.joinPath(webTestsDirectory, suggestedName),
+    defaultUri: defaultOutputUri,
     saveLabel: "Save WebTest",
     filters: { "DeoLoadTest WebTest": ["webtest.yaml"] }
   });
