@@ -47,7 +47,7 @@ export function activate(context: vscode.ExtensionContext): void {
   });
   const requestSelectionSubscription = requestExplorerView.onDidChangeSelection(({ selection }) => {
     const selectedRequest = selection[0];
-    if (selectedRequest) requestInspector.show(selectedRequest);
+    if (selectedRequest) requestInspector.show(selectedRequest, webTestDebugSession.requests);
   });
   let webTestRequestRows: string[] = [];
   let webTestFailureDetails: string[] = [];
@@ -103,7 +103,7 @@ export function activate(context: vscode.ExtensionContext): void {
         if (event.eventType === "RequestStarted" || event.eventType === "RequestCompleted" || event.eventType === "RequestFailed") {
           requestExplorer.refresh();
           const latestRequest = webTestDebugSession.requests[webTestDebugSession.requests.length - 1];
-          if (latestRequest) requestInspector.update(latestRequest);
+          requestInspector.update(webTestDebugSession.requests);
           timingInspector.update(webTestDebugSession.requests, webTestDebugSession.status);
         }
         if (event.eventType === "RequestCompleted" || event.eventType === "RequestFailed") {
