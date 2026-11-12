@@ -178,6 +178,38 @@
       }
     },
     "step": {
+      "defaultSnippets": [
+        {
+          "label": "Request",
+          "description": "HTTP request",
+          "body": "- name: example\n  request:\n    method: GET\n    url: https://example.com/"
+        },
+        {
+          "label": "Transaction",
+          "description": "Group steps in a transaction",
+          "body": "- transaction: example\n  steps:\n    - name: request\n      request:\n        method: GET\n        url: https://example.com/"
+        },
+        {
+          "label": "If",
+          "description": "Conditional execution",
+          "body": "- if: \${condition}\n  then:\n    - name: request\n      request:\n        method: GET\n        url: https://example.com/"
+        },
+        {
+          "label": "Loop",
+          "description": "Repeat a group of steps",
+          "body": "- loop:\n    for: 3\n  steps:\n    - name: request\n      request:\n        method: GET\n        url: https://example.com/"
+        },
+        {
+          "label": "Call",
+          "description": "Call another WebTest",
+          "body": "- call: path/to/another.webtest.yaml"
+        },
+        {
+          "label": "Code",
+          "description": "Execute custom code",
+          "body": "- code: // custom code"
+        }
+      ],
       "oneOf": [
         { "$ref": "#/definitions/requestStep" },
         { "type": "object", "required": ["transaction", "steps"], "properties": { "transaction": { "type": "string" }, "steps": { "type": "array", "items": { "$ref": "#/definitions/step" } } } },
