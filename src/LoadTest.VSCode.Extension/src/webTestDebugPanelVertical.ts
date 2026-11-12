@@ -70,7 +70,6 @@ export class WebTestDebugPanelVertical implements vscode.Disposable {
     const removedRequestIds: number[] = [];
 
     if (resetRequests) {
-      if (!force) removedRequestIds.push(...this.sentRequests.keys());
       this.sentRequests.clear();
       this.selectedRequestId = undefined;
     }
@@ -134,7 +133,7 @@ export class WebTestDebugPanelVertical implements vscode.Disposable {
       requests: changedRequests,
       removedRequestIds,
       resetRequests,
-      selectedRequest: selectedChanged ? selectedRequest : undefined
+      ...(selectedChanged ? { selectedRequest } : {})
     });
   }
 
@@ -258,9 +257,9 @@ export class WebTestDebugPanelVertical implements vscode.Disposable {
     while (requestCount >= allocatedSlots - PREFETCH_REMAINING) addSlots(BATCH_SIZE);
   }
 
-  function updateRow(request) {
-    ensureCapacity(request.id);
-    let row = rows.get(request.id);
+  function updateRow(request, slot) {
+    ensureCapacity(slot);
+    let row = rows.get(slot);
     if (!row) return;
     row.disabled = false;
     row.classList.remove("empty-row");
@@ -459,22 +458,11 @@ export class WebTestDebugPanelVertical implements vscode.Disposable {
     } else {
       ensureCapacity(message.visibleRequests || 0);
     }
-    (message.removedRequestIds || []).forEach(id => {
-      const row = rows.get(id);
-      if (row) {
-        row.remove();
-        rows.delete(id);
-      }
-    });
-    (message.requests || []).forEach(item => updateRow(item.request, item.slot));
     sessionStartedAt = message.startedAt === "—" ? null : message.startedAt;
+    (message.requests || []).forEach(item => updateRow(item.request, item.slot));
     updateSummary(message);
-    if (message.selectedRequest && (selectedRequestId === null || selectedRequestId === undefined)) {
-      renderInspector(message.selectedRequest);
-    } else if (message.selectedRequest && message.selectedRequest.id === selectedRequestId) {
-      renderInspector(message.selectedRequest);
-    } else if (!message.selectedRequest && selectedRequestId === null) {
-      renderInspector(null);
+    if (Object.prototype.hasOwnProperty.call(message, "selectedRequest")) {
+      renderInspector(message.selectedRequest || null);
     }
   });
 
