@@ -47,6 +47,14 @@ public sealed class WebTestRunner(EngineServices services)
                         row => row.Key,
                         row => row.Value.ToDictionary(value => value.Key, value => value.Value, StringComparer.Ordinal),
                         StringComparer.Ordinal),
+                    predefined = new
+                    {
+                        UserId = ctx.User.UserId,
+                        TestName = ctx.TestName,
+                        ScenarioName = ctx.User.ScenarioName,
+                        WebTestIteration = ctx.Iteration,
+                        LoadTestUserContext = ctx.User.UserContextId
+                    },
                     user = new
                     {
                         userId = ctx.User.UserId,
@@ -56,9 +64,7 @@ public sealed class WebTestRunner(EngineServices services)
                         controllerName = ctx.User.ControllerName,
                         scenarioName = ctx.User.ScenarioName,
                         isNewUser = ctx.User.IsNewUser
-                    },
-                    userItems = new Dictionary<string, object?>(ctx.User.Items, StringComparer.Ordinal),
-                    items = new Dictionary<string, object?>(ctx.Items, StringComparer.Ordinal)
+                    }
                 }
             });
             ok = await ExecuteStepsAsync(def.Steps, frame, ct);
