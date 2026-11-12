@@ -369,7 +369,8 @@ public sealed class LoadTestRunner
         var t = _opts.Services;
         return new EngineServices
         {
-            Http = http, Sink = _sink, OnExecutionEvent = t.OnExecutionEvent, ThinkTime = _think, Rules = t.Rules,
+            Http = http, Sink = _sink, OnExecutionEvent = t.OnExecutionEvent, OnPluginError = t.OnPluginError,
+            ThinkTime = _think, Rules = t.Rules,
             WebTestPlugins = t.WebTestPlugins, RequestPlugins = _requestPlugins, CodeSteps = t.CodeSteps,
             ValidationLevel = _def.RunSettings.ValidationLevel, LoadTest = _loadFn, MaxCallDepth = t.MaxCallDepth
         };
