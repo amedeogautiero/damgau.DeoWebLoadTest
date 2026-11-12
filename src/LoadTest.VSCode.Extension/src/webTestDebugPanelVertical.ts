@@ -512,6 +512,9 @@ export class WebTestDebugPanelVertical implements vscode.Disposable {
     if (Object.prototype.hasOwnProperty.call(message, "selectedRequest")) {
       renderInspector(message.selectedRequest || null);
     }
+    if (["completed", "failed", "cancelled"].includes(message.status)) {
+      document.querySelector(".summary").scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
   });
 
   addSlots(BATCH_SIZE);
