@@ -72,12 +72,20 @@ export class WebTestDebugSession {
   private currentTestName: string | undefined;
   private currentStartedAt: string | undefined;
   private currentFinishedAt: string | undefined;
+  private totalRequestCount = 0;
+  private successfulRequestCount = 0;
+  private failedRequestCount = 0;
+  private readonly requestDurationValues: number[] = [];
 
   get status(): DebugSessionStatus { return this.currentStatus; }
   get runId(): string | undefined { return this.currentRunId; }
   get testName(): string | undefined { return this.currentTestName; }
   get startedAt(): string | undefined { return this.currentStartedAt; }
   get finishedAt(): string | undefined { return this.currentFinishedAt; }
+  get totalRequests(): number { return this.totalRequestCount; }
+  get successfulRequests(): number { return this.successfulRequestCount; }
+  get failedRequests(): number { return this.failedRequestCount; }
+  get requestDurationsMs(): readonly number[] { return this.requestDurationValues; }
   get requests(): readonly DebugRequest[] { return this.requestItems; }
   get context(): WebTestContextSnapshot | undefined { return this.currentContext; }
   get summary(): DebugSessionSummary | undefined { return this.currentSummary; }
@@ -92,6 +100,10 @@ export class WebTestDebugSession {
     this.currentFinishedAt = undefined;
     this.currentContext = undefined;
     this.currentSummary = undefined;
+    this.totalRequestCount = 0;
+    this.successfulRequestCount = 0;
+    this.failedRequestCount = 0;
+    this.requestDurationValues.length = 0;
   }
 
   clearRequests(): void {
@@ -149,6 +161,7 @@ export class WebTestDebugSession {
   }
 
   private startRequest(event: WebTestExecutionEvent): void {
+    this.totalRequestCount++;
     this.requestItems.push({
       id: this.nextRequestId++,
       name: event.requestName,
@@ -178,6 +191,9 @@ export class WebTestDebugSession {
     }
 
     const previous = this.requestItems[index];
+    if (status === "succeeded") this.successfulRequestCount++;
+    else this.failedRequestCount++;
+    if (typeof event.elapsedMicros === "number") this.requestDurationValues.push(event.elapsedMicros / 1000);
     this.requestItems[index] = {
       ...previous,
       completedAt: event.timestampUtc,
