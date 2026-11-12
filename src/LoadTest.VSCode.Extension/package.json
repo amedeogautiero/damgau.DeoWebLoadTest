@@ -17,6 +17,7 @@
     "onCommand:deoloadtest.stopHost",
     "onCommand:deoloadtest.runLoadTest",
     "onCommand:deoloadtest.runWebTest",
+    "onCommand:deoloadtest.compileScript",
     "onCommand:deoloadtest.importHar",
     "onCommand:deoloadtest.focusRequestExplorer",
     "onCommand:deoloadtest.showTimingInspector",
@@ -48,6 +49,11 @@
         "command": "deoloadtest.runWebTest",
         "title": "DeoLoadTest: Run WebTest",
         "icon": "$(play)"
+      },
+      {
+        "command": "deoloadtest.compileScript",
+        "title": "DeoLoadTest: Compile C# Script",
+        "icon": "$(symbol-method)"
       },
       {
         "command": "deoloadtest.importHar",
