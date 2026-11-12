@@ -9,6 +9,10 @@ export class WebTestDebugPanelVertical implements vscode.Disposable {
   private readonly sentRequests = new Map<number, DebugRequest>();
   private lastSentSelectedRequestId: number | undefined;
   private lastSentSelectedRequest: DebugRequest | null | undefined;
+  private readonly durationValues = new Map<number, number>();
+  private durationSumMs = 0;
+  private durationMinMs = Number.POSITIVE_INFINITY;
+  private durationMaxMs = 0;
 
   constructor(
     private readonly session: WebTestDebugSession,
@@ -52,6 +56,7 @@ export class WebTestDebugPanelVertical implements vscode.Disposable {
         this.sentRequests.clear();
         this.lastSentSelectedRequestId = undefined;
         this.lastSentSelectedRequest = undefined;
+        this.resetDurationStats();
       });
       this.panel.webview.html = this.renderHtml();
     } else {
@@ -136,6 +141,22 @@ export class WebTestDebugPanelVertical implements vscode.Disposable {
       resetRequests,
       ...(selectedChanged ? { selectedRequest } : {})
     });
+  }
+
+  private recordDuration(request: DebugRequest): void {
+    if (typeof request.elapsedMicros !== "number" || this.durationValues.has(request.id)) return;
+    const durationMs = request.elapsedMicros / 1000;
+    this.durationValues.set(request.id, durationMs);
+    this.durationSumMs += durationMs;
+    this.durationMinMs = Math.min(this.durationMinMs, durationMs);
+    this.durationMaxMs = Math.max(this.durationMaxMs, durationMs);
+  }
+
+  private resetDurationStats(): void {
+    this.durationValues.clear();
+    this.durationSumMs = 0;
+    this.durationMinMs = Number.POSITIVE_INFINITY;
+    this.durationMaxMs = 0;
   }
 
   private parseTime(value?: string): number | undefined {
