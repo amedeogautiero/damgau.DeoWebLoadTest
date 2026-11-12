@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import Ajv, { ErrorObject } from "ajv";
-import { parseDocument, isMap, isSeq, isScalar, YAMLMap, YAMLSeq, Node } from "yaml";
+import { parseDocument, isMap, isSeq, isScalar, Node } from "yaml";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
@@ -32,7 +32,7 @@ function errorPath(error: ErrorObject): (string | number)[] {
     .split("/")
     .filter(Boolean)
     .map(segment => segment.replace(/~1/g, "/").replace(/~0/g, "~"))
-    .map(segment => /^\\d+$/.test(segment) ? Number(segment) : segment);
+    .map(segment => /^\d+$/.test(segment) ? Number(segment) : segment);
 
   if (error.keyword === "additionalProperties" &&
       typeof error.params.additionalProperty === "string") {
@@ -90,7 +90,7 @@ function validateDocument(document: vscode.TextDocument): void {
   // Preserve the exact source-notation rule: YAML parses 1.0 as JS number 1.
   for (let lineNumber = 0; lineNumber < document.lineCount; lineNumber++) {
     const line = document.lineAt(lineNumber);
-    const match = /^\\s*version\\s*:\\s*(\\d+\\.\\d+)\\s*(?:#.*)?$/.exec(line.text);
+    const match = /^\s*version\s*:\s*(\d+\.\d+)\s*(?:#.*)?$/.exec(line.text);
     if (!match) continue;
     const valueStart = line.text.indexOf(match[1]);
     const diagnostic = new vscode.Diagnostic(
