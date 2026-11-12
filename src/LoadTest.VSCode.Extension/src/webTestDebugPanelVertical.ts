@@ -133,12 +133,31 @@ export class WebTestDebugPanelVertical implements vscode.Disposable {
       '});' +
       'window.addEventListener("message",event=>{' +
       'const message=event.data;if(message?.command!=="refresh"||typeof message.html!=="string")return;' +
-      'const list=document.querySelector(".request-list"),inspector=document.querySelector(".inspector");' +
-      'const listTop=list?.scrollTop??0,inspectorTop=inspector?.scrollTop??0;' +
       'const parsed=new DOMParser().parseFromString(message.html,"text/html");' +
-      'document.body.innerHTML=parsed.body.innerHTML;' +
-      'const newList=document.querySelector(".request-list"),newInspector=document.querySelector(".inspector");' +
-      'if(newList)newList.scrollTop=listTop;if(newInspector)newInspector.scrollTop=inspectorTop;' +
+      'const currentList=document.querySelector(".request-list"),nextList=parsed.querySelector(".request-list");' +
+      'if(currentList&&nextList){' +
+      'const existing=new Map(Array.from(currentList.querySelectorAll("[data-select]")).map(row=>[row.dataset.select,row]));' +
+      'const nextRows=Array.from(nextList.querySelectorAll("[data-select]"));' +
+      'for(const nextRow of nextRows){const id=nextRow.dataset.select;const current=existing.get(id);' +
+      'if(current){if(current.outerHTML!==nextRow.outerHTML)current.replaceWith(nextRow);existing.delete(id);}' +
+      'else currentList.appendChild(nextRow);}' +
+      'for(const stale of existing.values())stale.remove();' +
+      'const empty=nextList.querySelector(".empty");const currentEmpty=currentList.querySelector(".empty");' +
+      'if(empty&&!currentEmpty)currentList.appendChild(empty);else if(!empty&&currentEmpty)currentEmpty.remove();' +
+      '}' +
+      'const currentInspector=document.querySelector(".inspector"),nextInspector=parsed.querySelector(".inspector");' +
+      'if(currentInspector&&nextInspector){const oldContent=currentInspector.innerHTML,newContent=nextInspector.innerHTML;' +
+      'if(oldContent!==newContent){const scroll=currentInspector.scrollTop;currentInspector.innerHTML=newContent;currentInspector.scrollTop=scroll;}}' +
+      'const currentHeading=document.querySelector(".explorer>.section-heading"),nextHeading=parsed.querySelector(".explorer>.section-heading");' +
+      'if(currentHeading&&nextHeading)currentHeading.innerHTML=nextHeading.innerHTML;' +
+      'const currentSummary=document.querySelector(".summary"),nextSummary=parsed.querySelector(".summary");' +
+      'if(currentSummary&&nextSummary&&currentSummary.innerHTML!==nextSummary.innerHTML)currentSummary.innerHTML=nextSummary.innerHTML;' +
+      'const currentStatus=document.querySelector("header .status"),nextStatus=parsed.querySelector("header .status");' +
+      'if(currentStatus&&nextStatus)currentStatus.replaceWith(nextStatus);' +
+      'for(const id of ["run","stop","clear"]){const current=document.getElementById(id),next=parsed.getElementById(id);' +
+      'if(current&&next)current.disabled=next.disabled;}' +
+      'const currentTest=document.querySelector(".test-name"),nextTest=parsed.querySelector(".test-name");' +
+      'if(currentTest&&nextTest)currentTest.textContent=nextTest.textContent;' +
       '});' +
       '</script></body></html>';
   }
