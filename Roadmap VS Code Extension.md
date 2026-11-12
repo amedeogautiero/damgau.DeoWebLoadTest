@@ -38,6 +38,7 @@ Fase 5 – Importazione HAR
 | 16 | HAR Converter | Conversione in un singolo `.webtest.yaml`. |
 | 17 | Save WebTest | Salvataggio del risultato nella cartella `webtests`. |
 
+
 Fase 6 – WebTest Debugger
 | # | Componente | Descrizione |
 |---|---|---|
@@ -93,3 +94,9 @@ Ordine effettivo di sviluppo
 
 -----------------
 Una precisazione: responseTimeGoal è citata nel contratto, ma non è ancora implementata. Non l'ho quindi inserita tra le regole disponibili nello schema. (per intellisense dello yaml di un webtest)
+
+------------------
+possibilità di entrare anche nelle richieste positive e vederne i dati di contesto ecc....
+
+------------------
+'errore di una richiesta non vuol dire che tutto il test si deve farmare...
