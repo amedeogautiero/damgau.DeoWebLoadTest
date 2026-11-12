@@ -18,7 +18,9 @@ export class WebTestDebugPanelVertical implements vscode.Disposable {
     private readonly session: WebTestDebugSession,
     private readonly onRun: () => void,
     private readonly onStop: () => void,
-    private readonly onClear: () => void
+    private readonly onClear: () => void,
+    private readonly onHostStart: () => void,
+    private readonly onHostStop: () => void
   ) {}
 
   show(): void {
@@ -41,6 +43,10 @@ export class WebTestDebugPanelVertical implements vscode.Disposable {
           this.onStop();
         } else if (message?.command === "clear") {
           this.onClear();
+        } else if (message?.command === "hostStart") {
+          this.onHostStart();
+        } else if (message?.command === "hostStop") {
+          this.onHostStop();
         } else if (message?.command === "select" && Number.isInteger(message.requestId)) {
           this.selectedRequestId = message.requestId;
           const selectedRequestId = this.selectedRequestId;
@@ -183,6 +189,7 @@ export class WebTestDebugPanelVertical implements vscode.Disposable {
 <header>
   <div><h1>DeoLoadTest Debug Panel - Vertical</h1><div class="test-name" id="test-name">No WebTest selected</div></div>
   <div class="toolbar">
+    <button id="host-start">▶ Start Host</button><button id="host-stop" class="danger">■ Stop Host</button>
     <button id="run">▶ Run</button><button id="stop" class="danger" disabled>■ Stop</button>
     <button id="clear" disabled>Clear</button><span id="status" class="status muted"><i></i>Idle</span>
   </div>
@@ -282,6 +289,15 @@ export class WebTestDebugPanelVertical implements vscode.Disposable {
   function ensureCapacity(requestCount) {
     if (allocatedSlots === 0) addSlots(BATCH_SIZE);
     while (requestCount >= allocatedSlots - PREFETCH_REMAINING) addSlots(BATCH_SIZE);
+  }
+
+  function trimEmptySlots(requestCount) {
+    for (let slot = allocatedSlots; slot > requestCount; slot--) {
+      const row = rows.get(slot);
+      if (row) row.remove();
+      rows.delete(slot);
+    }
+    allocatedSlots = requestCount;
   }
 
   function updateRow(request, slot) {
@@ -464,7 +480,9 @@ export class WebTestDebugPanelVertical implements vscode.Disposable {
   document.addEventListener("click", function (event) {
     const target = event.target instanceof Element ? event.target.closest("button") : null;
     if (!target || target.disabled) return;
-    if (target.id === "run") vscode.postMessage({ command: "run" });
+    if (target.id === "host-start") vscode.postMessage({ command: "hostStart" });
+    else if (target.id === "host-stop") vscode.postMessage({ command: "hostStop" });
+    else if (target.id === "run") vscode.postMessage({ command: "run" });
     else if (target.id === "stop") vscode.postMessage({ command: "stop" });
     else if (target.id === "clear") vscode.postMessage({ command: "clear" });
     else if (target.dataset.select) vscode.postMessage({ command: "select", requestId: Number(target.dataset.select) });
@@ -487,6 +505,9 @@ export class WebTestDebugPanelVertical implements vscode.Disposable {
     }
     sessionStartedAt = message.startedAt === "—" ? null : message.startedAt;
     (message.requests || []).forEach(item => updateRow(item.request, item.slot));
+    if (["completed", "failed", "cancelled"].includes(message.status)) {
+      trimEmptySlots(message.visibleRequests || 0);
+    }
     updateSummary(message);
     if (Object.prototype.hasOwnProperty.call(message, "selectedRequest")) {
       renderInspector(message.selectedRequest || null);
