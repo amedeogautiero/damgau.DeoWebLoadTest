@@ -36,9 +36,11 @@ public class ScriptCompilerTests
     [Fact]
     public void CompileWithSymbols_emits_portable_pdb()
     {
-        using var temp = Directory.CreateTempSubdirectory("csx-pdb");
-        var sourcePath = Path.GetFullPath(Path.Combine(temp.FullName, "DebugScript.csx"));
-        const string code = """
+        var temp = Directory.CreateTempSubdirectory("csx-pdb");
+        try
+        {
+            var sourcePath = Path.GetFullPath(Path.Combine(temp.FullName, "DebugScript.csx"));
+            const string code = """
             public sealed class DebugScript : ICodedTest
             {
                 public Task RunAsync(TestContext ctx)
@@ -54,10 +56,15 @@ public class ScriptCompilerTests
             "DebugScript",
             new Dictionary<string, string> { [sourcePath] = code });
 
-        Assert.NotEmpty(result.Assembly);
-        Assert.NotNull(result.Pdb);
-        Assert.NotEmpty(result.Pdb!);
-        Assert.Equal("BSJB", System.Text.Encoding.ASCII.GetString(result.Pdb!, 0, 4));
+            Assert.NotEmpty(result.Assembly);
+            Assert.NotNull(result.Pdb);
+            Assert.NotEmpty(result.Pdb!);
+            Assert.Equal("BSJB", System.Text.Encoding.ASCII.GetString(result.Pdb!, 0, 4));
+        }
+        finally
+        {
+            temp.Delete(recursive: true);
+        }
     }
 
     [Fact]
