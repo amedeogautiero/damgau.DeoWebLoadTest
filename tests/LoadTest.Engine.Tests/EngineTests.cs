@@ -171,6 +171,16 @@ public class EngineTests
         Assert.Contains(events, e => e.EventType == "RequestCompleted");
         Assert.Contains(events, e => e.EventType == "TestCompleted");
 
+        var requestStartedSnapshot = Assert.IsType<System.Text.Json.JsonElement>(
+            System.Text.Json.JsonSerializer.SerializeToElement(
+                events.First(e => e.EventType == "RequestStarted").ContextSnapshot));
+        Assert.Equal("abc", requestStartedSnapshot.GetProperty("variables").GetProperty("token").GetString());
+
+        var requestCompletedSnapshot = Assert.IsType<System.Text.Json.JsonElement>(
+            System.Text.Json.JsonSerializer.SerializeToElement(
+                events.First(e => e.EventType == "RequestCompleted").ContextSnapshot));
+        Assert.Equal("xyz", requestCompletedSnapshot.GetProperty("variables").GetProperty("csrf").GetString());
+
         var snapshot = Assert.IsType<System.Text.Json.JsonElement>(
             System.Text.Json.JsonSerializer.SerializeToElement(
                 events.First(e => e.EventType == "ContextSnapshot").ContextSnapshot));
