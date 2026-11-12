@@ -3,6 +3,10 @@ import { DebugRequest, WebTestDebugSession } from "./webTestDebugSession";
 
 const TIMELINE_WIDTH = 16;
 
+function isDebugRequest(item: DebugRequest | vscode.TreeItem): item is DebugRequest {
+  return "status" in item && typeof item.status === "string";
+}
+
 export class WebTestRequestExplorer implements vscode.TreeDataProvider<DebugRequest | vscode.TreeItem> {
   private readonly changed = new vscode.EventEmitter<DebugRequest | vscode.TreeItem | undefined | void>();
   readonly onDidChangeTreeData = this.changed.event;
@@ -14,7 +18,7 @@ export class WebTestRequestExplorer implements vscode.TreeDataProvider<DebugRequ
   }
 
   getTreeItem(request: DebugRequest | vscode.TreeItem): vscode.TreeItem {
-    if (typeof (request as DebugRequest).status !== "string") return request as vscode.TreeItem;
+    if (!isDebugRequest(request)) return request;
     const method = (request.method ?? "???").toUpperCase();
     const label = `#${String(request.id).padStart(3, "0")}  ${method}  ${this.shortUrl(request.url)}  │ ${this.timelineFor(request)}`;
     const item = new vscode.TreeItem(label, vscode.TreeItemCollapsibleState.None);
