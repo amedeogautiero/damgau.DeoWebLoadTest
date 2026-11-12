@@ -4,6 +4,7 @@ import { HostManager } from "./hostManager";
 import { importHarFile } from "./harImporter";
 import { registerWebTestValidator } from "./webTestValidator";
 import { WebTestDebugSession, WebTestExecutionEvent } from "./webTestDebugSession";
+import { WebTestRequestExplorer } from "./webTestRequestExplorer";
 
 interface RunNotificationParams {
   runId?: string;
@@ -35,6 +36,11 @@ export function activate(context: vscode.ExtensionContext): void {
   registerWebTestValidator(context);
   let activeRunId: string | undefined;
   const webTestDebugSession = new WebTestDebugSession();
+  const requestExplorer = new WebTestRequestExplorer(webTestDebugSession);
+  const requestExplorerView = vscode.window.createTreeView("deoloadtest.requestExplorer", {
+    treeDataProvider: requestExplorer,
+    showCollapseAll: false
+  });
   let webTestRequestRows: string[] = [];
   let webTestFailureDetails: string[] = [];
   let webTestSuccessfulRequests = 0;
@@ -86,6 +92,9 @@ export function activate(context: vscode.ExtensionContext): void {
       case "webtest.event": {
         const event = params.event ?? {};
         webTestDebugSession.applyExecutionEvent(event);
+        if (event.eventType === "RequestStarted" || event.eventType === "RequestCompleted" || event.eventType === "RequestFailed") {
+          requestExplorer.refresh();
+        }
         if (event.eventType === "RequestCompleted" || event.eventType === "RequestFailed") {
           const success = event.eventType === "RequestCompleted";
           if (success) webTestSuccessfulRequests++;
@@ -128,6 +137,7 @@ export function activate(context: vscode.ExtensionContext): void {
       case "webtest.completed": {
         const result = params.result ?? {};
         webTestDebugSession.complete(result);
+        requestExplorer.refresh();
         const total = webTestSuccessfulRequests + webTestFailedRequests;
         runOutput.appendLine("");
         runOutput.appendLine("Requests:");
@@ -155,6 +165,7 @@ export function activate(context: vscode.ExtensionContext): void {
       }
       case "webtest.failed":
         webTestDebugSession.fail();
+        requestExplorer.refresh();
         runOutput.appendLine(`WebTest execution failed: ${params.error?.message ?? "Unknown error"}`);
         if (params.error?.details) runOutput.appendLine(params.error.details);
         activeRunId = undefined;
@@ -164,6 +175,7 @@ export function activate(context: vscode.ExtensionContext): void {
         break;
       case "webtest.cancelled":
         webTestDebugSession.cancel();
+        requestExplorer.refresh();
         runOutput.appendLine(`WebTest ${params.runId ?? activeRunId ?? ""} cancelled.`);
         activeRunId = undefined;
         void vscode.window.showInformationMessage("WebTest cancelled.");
@@ -264,12 +276,21 @@ export function activate(context: vscode.ExtensionContext): void {
         const result = await communicationClient.startWebTest(selection[0].fsPath);
         activeRunId = result.runId;
         webTestDebugSession.start(result.runId);
+        requestExplorer.refresh();
         runOutput.appendLine(`WebTest accepted. Run ID: ${result.runId}`);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         runOutput.appendLine(`Unable to start WebTest: ${message}`);
         void vscode.window.showErrorMessage(`Unable to start WebTest: ${message}`);
       }
+    }
+  );
+
+  const focusRequestExplorerCommand = vscode.commands.registerCommand(
+    "deoloadtest.focusRequestExplorer",
+    async () => {
+      await vscode.commands.executeCommand("workbench.view.explorer");
+      await vscode.commands.executeCommand("deoloadtest.requestExplorer.focus");
     }
   );
 
