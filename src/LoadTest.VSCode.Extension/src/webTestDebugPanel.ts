@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { DebugRequest, DebugSessionStatus, WebTestDebugSession } from "./webTestDebugSession";
+import { DebugRequest, WebTestDebugSession } from "./webTestDebugSession";
 
 const MAX_DISPLAY_CHARS = 64 * 1024;
 
@@ -60,10 +60,10 @@ export class WebTestDebugPanel implements vscode.Disposable {
   private renderHtml(requests: readonly DebugRequest[], selected?: DebugRequest): string {
     const status = this.session.status;
     const running = status === "running";
-    const completed = requests.filter(r => r.status !== "pending");
-    const succeeded = requests.filter(r => r.status === "succeeded").length;
-    const failed = requests.filter(r => r.status === "failed").length;
-    const durations = completed.filter(r => typeof r.elapsedMicros === "number").map(r => r.elapsedMicros! / 1000);
+    const succeeded = this.session.successfulRequests;
+    const failed = this.session.failedRequests;
+    const completedCount = succeeded + failed;
+    const durations = [...this.session.requestDurationsMs];
     const sum = durations.reduce((a, b) => a + b, 0);
     const average = durations.length ? sum / durations.length : 0;
     const min = durations.length ? Math.min(...durations) : 0;
@@ -71,8 +71,8 @@ export class WebTestDebugPanel implements vscode.Disposable {
     const start = this.parseTime(this.session.startedAt);
     const end = this.parseTime(this.session.finishedAt) ?? Date.now();
     const elapsed = start === undefined ? 0 : Math.max(0, end - start);
-    const rate = elapsed > 0 ? completed.length / (elapsed / 1000) : 0;
-    const successRate = completed.length ? succeeded / completed.length * 100 : 0;
+    const rate = elapsed > 0 ? completedCount / (elapsed / 1000) : 0;
+    const successRate = completedCount ? succeeded / completedCount * 100 : 0;
     const statusLabel = status.charAt(0).toUpperCase() + status.slice(1);
     const statusClass = status === "completed" ? "success" : status === "failed" ? "failure" : running ? "running" : "muted";
     const rows = requests.map(request => {
@@ -104,8 +104,8 @@ export class WebTestDebugPanel implements vscode.Disposable {
       (selected ? this.renderRequest(selected, requests) : '<div class="empty">Select a request to inspect its details.</div>') + '</section></main>' +
       '<section class="summary"><div class="section-heading">EXECUTION SUMMARY <span>' + statusLabel + '</span></div>' +
       '<div class="metrics">' +
-      this.metric("Requests", String(requests.length)) + this.metric("Successful", String(succeeded), "success") +
-      this.metric("Failed", String(failed), failed ? "failure" : "") + this.metric("Success rate", completed.length ? successRate.toFixed(2) + "%" : "—") +
+      this.metric("Requests", String(this.session.totalRequests)) + this.metric("Successful", String(succeeded), "success") +
+      this.metric("Failed", String(failed), failed ? "failure" : "") + this.metric("Success rate", completedCount ? successRate.toFixed(2) + "%" : "—") +
       this.metric("Total duration", this.ms(elapsed)) + this.metric("Requests/sec", rate.toFixed(2)) +
       this.metric("Avg response", durations.length ? this.ms(average) : "—") + this.metric("Min response", durations.length ? this.ms(min) : "—") +
       this.metric("Max response", durations.length ? this.ms(max) : "—") + '</div>' +
