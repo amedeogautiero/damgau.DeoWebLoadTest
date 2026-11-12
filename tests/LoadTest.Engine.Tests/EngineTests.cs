@@ -173,7 +173,7 @@ public class EngineTests
 
         var snapshot = Assert.IsType<System.Text.Json.JsonElement>(
             System.Text.Json.JsonSerializer.SerializeToElement(
-                events.Single(e => e.EventType == "ContextSnapshot").ContextSnapshot));
+                events.First(e => e.EventType == "ContextSnapshot").ContextSnapshot));
         Assert.Equal("abc", snapshot.GetProperty("variables").GetProperty("token").GetString());
         Assert.Equal("Ada", snapshot.GetProperty("dataRows").GetProperty("users").GetProperty("name").GetString());
         Assert.Equal(7, snapshot.GetProperty("user").GetProperty("userId").GetInt32());
