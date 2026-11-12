@@ -20,6 +20,10 @@ export class HostManager implements vscode.Disposable {
     return !!this.process && this.process.exitCode === null && !this.stopping;
   }
 
+  get processId(): number | undefined {
+    return this.process?.pid;
+  }
+
   async start(): Promise<void> {
     if (this.process && this.process.exitCode === null) {
       if (this.startup) await this.startup;
