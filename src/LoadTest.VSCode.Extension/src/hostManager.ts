@@ -15,6 +15,10 @@ export class HostManager implements vscode.Disposable {
 
   constructor(private readonly extensionPath: string) {}
 
+  get isRunning(): boolean {
+    return !!this.process && this.process.exitCode === null && !this.stopping;
+  }
+
   async start(): Promise<void> {
     if (this.process && this.process.exitCode === null) {
       if (this.startup) await this.startup;
