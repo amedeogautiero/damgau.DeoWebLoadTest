@@ -52,7 +52,7 @@ public static class PluginLoader
     /// <summary>Versione dell'SDK dell'host, presa dall'assembly (nessuna costante nel contratto: vedi nota S2).</summary>
     public static Version HostSdkVersion { get; } = typeof(IWebTestPlugin).Assembly.GetName().Version ?? new Version(1, 0);
 
-    /// <summary>Carica un pacchetto con entry .dll. Per .csx vedi la fase 2 (compilazione sul controller).</summary>
+    /// <summary>Carica un pacchetto con entry .dll e, se presente, il Portable PDB associato. I pacchetti .csx vanno compilati prima dal processo che prepara l'esecuzione.</summary>
     public static LoadedPlugin Load(PluginPackage pkg)
     {
         var m = pkg.Manifest;
