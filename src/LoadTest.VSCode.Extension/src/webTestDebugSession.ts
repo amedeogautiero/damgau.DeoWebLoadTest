@@ -50,6 +50,8 @@ export interface DebugRequest {
   readonly errorMessage?: string;
   readonly exceptionDetails?: string;
   readonly requestDefinition?: unknown;
+  readonly contextAtStart?: WebTestContextSnapshot;
+  readonly contextAtEnd?: WebTestContextSnapshot;
   readonly status: DebugRequestStatus;
 }
 
@@ -155,6 +157,7 @@ export class WebTestDebugSession {
       url: event.url,
       requestHeaders: event.requestHeaders,
       requestBody: event.requestBody,
+      contextAtStart: event.contextSnapshot,
       status: "pending"
     });
   }
@@ -191,6 +194,8 @@ export class WebTestDebugSession {
       errorMessage: event.errorMessage,
       exceptionDetails: event.exceptionDetails,
       requestDefinition: event.requestDefinition,
+      contextAtStart: previous.contextAtStart ?? event.contextSnapshot,
+      contextAtEnd: event.contextSnapshot,
       status
     };
   }
