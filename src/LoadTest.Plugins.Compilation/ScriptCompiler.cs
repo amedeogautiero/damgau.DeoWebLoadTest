@@ -15,7 +15,9 @@ public sealed class ScriptCompilationException(IReadOnlyList<string> errors)
 public sealed record ScriptCompilationResult(byte[] Assembly, byte[]? Pdb);
 
 /// <summary>
-/// Compila sorgenti .csx in un assembly (IL portabile), una volta sola, sul controller (CONTRATTO sez. 1).
+/// Compila sorgenti .csx in un assembly (IL portabile) nel processo che prepara l'esecuzione.
+/// Il Controller usa il compilatore nel flusso di packaging attuale; il VS Code Host può usarlo
+/// direttamente per la compilazione locale e la generazione dei simboli di debug.
 /// PROPOSTA P2: il .csx contiene using e classi pubbliche che implementano le interfacce SDK, nessuna istruzione top-level
 /// (compilato come libreria, non come script: i tipi restano di primo livello e scopribili dal caricatore).
 /// Using impliciti (convenienza, PROPOSTA): System, System.Collections.Generic, System.Linq, System.Threading,
