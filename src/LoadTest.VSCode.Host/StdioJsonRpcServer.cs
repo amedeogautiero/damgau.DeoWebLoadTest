@@ -255,9 +255,10 @@ internal sealed class StdioJsonRpcServer(TextReader input, TextWriter output, Te
                     if (executionEvent.EventType == "RequestStarted")
                         Interlocked.Increment(ref requestCount);
 
-                    // Le richieste fallite devono essere sempre diagnosticate, anche
-                    // quando il debug dettagliato è disattivato.
-                    if (request.DebugMode || executionEvent.EventType == "RequestFailed")
+                    // Il WebTest standalone mostra sempre una riga per ogni richiesta.
+                    // DebugMode aggiunge gli altri eventi diagnostici.
+                    if (request.DebugMode ||
+                        executionEvent.EventType is "RequestCompleted" or "RequestFailed")
                         WriteNotification("webtest.event", new
                         {
                             runId = active.RunId,
