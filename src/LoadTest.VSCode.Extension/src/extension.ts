@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { CommunicationClient, HostNotification } from "./communicationClient";
 import { HostManager } from "./hostManager";
+import { HostDebugger } from "./hostDebugger";
 import { importHarFile } from "./harImporter";
 import { registerWebTestValidator } from "./webTestValidator";
 import { WebTestDebugSession, WebTestExecutionEvent } from "./webTestDebugSession";
@@ -35,6 +36,7 @@ interface RunNotificationParams {
 
 export function activate(context: vscode.ExtensionContext): void {
   const hostManager = new HostManager(context.extensionUri.fsPath);
+  const hostDebugger = new HostDebugger(hostManager);
   const communicationClient = new CommunicationClient(hostManager);
   const runOutput = vscode.window.createOutputChannel("DeoLoadTest Run");
   registerWebTestValidator(context);
@@ -299,13 +301,6 @@ export function activate(context: vscode.ExtensionContext): void {
         void vscode.window.showWarningMessage("A WebTest is already running.");
         return;
       }
-      if (!hostManager.isRunning || !communicationClient.isInitialized) {
-        void vscode.window.showErrorMessage(
-          "DeoLoadTest Host is not started and initialized. Run 'DeoLoadTest: Start Host' first."
-        );
-        return;
-      }
-
       const selection = await vscode.window.showOpenDialog({
         canSelectMany: false,
         openLabel: "Run WebTest",
@@ -325,7 +320,13 @@ export function activate(context: vscode.ExtensionContext): void {
         runOutput.appendLine(`Starting WebTest: ${selection[0].fsPath}`);
         runOutput.appendLine("");
 
-        // WebTest Debugger: compila i passi C# con Portable PDB per consentire i breakpoint CLR.
+        // Avvia il processo Host, inizializza JSON-RPC e collega il debugger CLR
+        // prima di inviare webtest.run, così i breakpoint sono già attivi al primo step.
+        if (!hostManager.isRunning) await hostManager.start();
+        if (!communicationClient.isInitialized) await communicationClient.initialize();
+        await hostDebugger.attach();
+
+        // Compila i passi C# con Portable PDB per consentire i breakpoint CLR.
         const result = await communicationClient.startWebTest(selection[0].fsPath, true);
         activeRunId = result.runId;
         activeWebTestRunId = result.runId;
@@ -487,6 +488,7 @@ export function activate(context: vscode.ExtensionContext): void {
     clearRequestExplorerCommand,
     focusRequestExplorerCommand,
     communicationClient,
+    hostDebugger,
     hostManager,
     runOutput
   );
