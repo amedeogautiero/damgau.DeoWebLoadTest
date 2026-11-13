@@ -1,9 +1,9 @@
 using LoadTest.Sdk;
 using LoadTest.WebTestSample.Scripts;
 
-namespace LoadTest.WebTestSample.UnitTests;
+namespace LoadTest.WebTestSample;
 
-public sealed class CalcolaValoreTests
+public sealed class WebTestSampleTests
 {
     [Fact]
     public async Task RunAsync_calcola_il_totale_e_aggiorna_il_contesto()
