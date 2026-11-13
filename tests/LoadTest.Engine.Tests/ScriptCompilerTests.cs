@@ -186,7 +186,7 @@ public class ScriptCompilerTests
             var pdbId = reader.DebugMetadataHeader!.Id;
             Assert.True(pdbId.Length >= 20);
             Assert.Equal(new Guid(pdbId.AsSpan(0, 16)), codeView.Guid);
-            Assert.Equal(BitConverter.ToUInt32(pdbId.AsSpan(16, 4)), codeView.Stamp);
+            Assert.Equal(BitConverter.ToUInt32(pdbId.AsSpan(16, 4)), codeViewEntry.Stamp);
 
             // Se presente, il record PdbChecksum della DLL deve corrispondere ai byte del PDB.
             var checksumEntry = debugEntries.SingleOrDefault(entry =>
