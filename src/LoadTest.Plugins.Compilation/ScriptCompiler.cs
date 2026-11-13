@@ -165,14 +165,6 @@ public static class ScriptPackageCompiler
         {
             var file = Path.GetFileName(csxPath);
             File.Copy(csxPath, Path.Combine(tmp, file));
-            var originalBytes = File.ReadAllBytes(csxPath);
-            var copiedBytes = File.ReadAllBytes(Path.Combine(tmp, file));
-
-            var identical = originalBytes.SequenceEqual(copiedBytes);
-
-            Console.WriteLine($"[ScriptCompiler] Originale: {originalBytes.Length} byte");
-            Console.WriteLine($"[ScriptCompiler] Copia:     {copiedBytes.Length} byte");
-            Console.WriteLine($"[ScriptCompiler] Identici:  {identical}");
             var implicitManifest = new PluginManifest
             {
                 Name = name, Version = "1.0.0", Sdk = $">={host.Major}.{host.Minor} <{host.Major + 1}.0",
