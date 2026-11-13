@@ -203,6 +203,74 @@ public class ScriptCompilerTests
     }
 
     [Fact]
+    public void CompileSingleFile_calculate_value_fixture_pdb_matches_source()
+    {
+        var sourcePath = Path.GetFullPath(Path.Combine(
+            AppContext.BaseDirectory, "Fixtures", "CalculateValue.csx"));
+
+        Assert.True(File.Exists(sourcePath), $"Fixture non trovata: {sourcePath}");
+        var sourceText = File.ReadAllText(sourcePath);
+        Assert.False(string.IsNullOrWhiteSpace(sourceText),
+            "Inserire il contenuto reale di CalculateValue.csx nella fixture prima di eseguire questo test.");
+
+        var cache = new PluginCache(Path.Combine(
+            Path.GetTempPath(), "LoadTest.Tests", Guid.NewGuid().ToString("N")));
+        var package = ScriptPackageCompiler.CompileSingleFile(
+            sourcePath, cache, emitSymbols: true);
+
+        var pdbName = Path.GetFileNameWithoutExtension(package.Manifest.Entry) + ".pdb";
+        var pdbPath = Path.Combine(package.Directory, pdbName);
+        var assemblyPath = Path.Combine(package.Directory, package.Manifest.Entry);
+        Assert.True(File.Exists(pdbPath), $"PDB non trovato: {pdbPath}");
+        Assert.True(File.Exists(assemblyPath), $"Assembly non trovato: {assemblyPath}");
+
+        using var pdbStream = File.OpenRead(pdbPath);
+        using var provider = MetadataReaderProvider.FromPortablePdbStream(pdbStream);
+        var reader = provider.GetMetadataReader();
+        var documentHandle = reader.Documents.Single(handle =>
+            string.Equals(reader.GetString(reader.GetDocument(handle).Name),
+                sourcePath, StringComparison.OrdinalIgnoreCase));
+        var document = reader.GetDocument(documentHandle);
+
+        Assert.Equal(new Guid("ff1816ec-aa5e-4d10-87f7-6f4963833460"),
+            reader.GetGuid(document.HashAlgorithm));
+
+        var parseOptions = new CSharpParseOptions(
+            LanguageVersion.Latest, DocumentationMode.None, SourceCodeKind.Regular);
+        var sourceTree = CSharpSyntaxTree.ParseText(
+            sourceText, parseOptions, path: sourcePath, encoding: Encoding.UTF8);
+        var expectedHash = sourceTree.GetText().GetChecksum().ToArray();
+        var actualHash = reader.GetBlobBytes(document.Hash);
+        Assert.Equal(expectedHash, actualHash);
+
+        var sequencePoints = reader.MethodDebugInformation
+            .SelectMany(handle =>
+            {
+                var methodDebug = reader.GetMethodDebugInformation(handle);
+                return methodDebug.GetSequencePoints().Select(point => new
+                {
+                    Document = point.Document.IsNil ? methodDebug.Document : point.Document,
+                    point.IsHidden
+                });
+            })
+            .Where(point => !point.IsHidden && point.Document == documentHandle)
+            .ToArray();
+        Assert.NotEmpty(sequencePoints);
+
+        using var assemblyStream = File.OpenRead(assemblyPath);
+        using var peReader = new PEReader(assemblyStream);
+        var codeViewEntry = Assert.Single(peReader.ReadDebugDirectory().Where(entry =>
+            entry.Type == DebugDirectoryEntryType.CodeView));
+        var codeView = peReader.ReadCodeViewDebugDirectoryData(codeViewEntry);
+        Assert.EndsWith(pdbName, codeView.Path, StringComparison.OrdinalIgnoreCase);
+
+        var pdbId = reader.DebugMetadataHeader!.Id;
+        Assert.True(pdbId.Length >= 20);
+        Assert.Equal(new Guid(pdbId.AsSpan(0, 16)), codeView.Guid);
+        Assert.Equal(BitConverter.ToUInt32(pdbId.AsSpan(16, 4)), codeViewEntry.Stamp);
+    }
+
+    [Fact]
     public void Single_file_becomes_implicit_coded_test_package()
     {
         const string code = """
