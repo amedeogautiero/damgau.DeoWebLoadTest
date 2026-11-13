@@ -481,7 +481,7 @@ export function activate(context: vscode.ExtensionContext): void {
             { cwd: projectDirectory, maxBuffer: 10 * 1024 * 1024 },
             (error, stdout, stderr) => {
               if (error) {
-                const details = [stdout, stderr].filter(Boolean).join("\\n");
+                const details = [stdout, stderr].filter(Boolean).join("\n");
                 reject(new Error(details || error.message));
                 return;
               }
@@ -584,6 +584,7 @@ export function activate(context: vscode.ExtensionContext): void {
     runLoadTestCommand,
     runWebTestCommand,
     compileScriptCommand,
+    compileWebTestCommand,
     stopWebTestCommand,
     importHarCommand,
     stopHostCommand,
