@@ -77,8 +77,11 @@ export class CommunicationClient implements vscode.Disposable {
     return this.request<RunStartResult>("run.start", { loadTestFile });
   }
 
-  async startWebTest(webTestFile: string, debugMode = false): Promise<RunStartResult> {
-    return this.request<RunStartResult>("webtest.run", { webTestFile, debugMode });
+  async startWebTest(webTestDirectory: string, webTestFile: string, debugMode = false): Promise<RunStartResult> {
+    return this.request<RunStartResult>(
+      "webtest.run",
+      { webTestDirectory, webTestFile, debugMode }
+    );
   }
 
   async cancelRun(runId: string): Promise<{ accepted: boolean; runId: string }> {
