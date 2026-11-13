@@ -4,8 +4,9 @@ namespace LoadTest.WebTestSample.Scripts;
 
 /// <summary>
 /// Esempio di Code Step implementato come normale classe C#.
+/// 
 /// </summary>
-public sealed class CalcolaValore : ICodedTest
+public sealed class CalcolaValore : ICodedTest 
 {
     public Task RunAsync(TestContext ctx)
     {
