@@ -12,7 +12,7 @@ steps:
       method: GET
       url: https://example.com/
     expectedStatus: 200
-  - code: CalculateValue.csx
+  - code: CalcolaValore
   - name: es2
     request:
       method: GET
