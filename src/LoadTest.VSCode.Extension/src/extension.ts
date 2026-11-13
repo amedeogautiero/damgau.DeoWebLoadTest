@@ -323,12 +323,74 @@ export function activate(context: vscode.ExtensionContext): void {
         runOutput.appendLine(`Starting WebTest: ${selection[0].fsPath}`);
         runOutput.appendLine("");
 
+        // Individua il progetto WebTest che contiene il file selezionato.
+        const projects = await vscode.workspace.findFiles(
+          "**/LoadTest.WebTestSample.csproj",
+          "**/{bin,obj,node_modules}/**"
+        );
+        const selectedFile = path.resolve(selection[0].fsPath);
+        const matchingProjects = projects.filter(project => {
+          const projectDirectory = path.dirname(project.fsPath);
+          const relative = path.relative(projectDirectory, selectedFile);
+          return relative !== "" && !relative.startsWith("..") && !path.isAbsolute(relative);
+        });
+
+        if (matchingProjects.length === 0) {
+          throw new Error("No LoadTest.WebTestSample.csproj contains the selected WebTest file.");
+        }
+
+        let projectUri = matchingProjects[0];
+        if (matchingProjects.length > 1) {
+          const selectedProject = await vscode.window.showQuickPick(
+            matchingProjects.map(uri => ({
+              label: path.basename(path.dirname(uri.fsPath)),
+              description: vscode.workspace.asRelativePath(uri),
+              uri
+            })),
+            { placeHolder: "Select the WebTest project to compile" }
+          );
+          if (!selectedProject) return;
+          projectUri = selectedProject.uri;
+        }
+
+        const projectPath = projectUri.fsPath;
+        const projectDirectory = path.dirname(projectPath);
+        const outputDirectory = path.join(projectDirectory, "bin", "WebTest");
+        const webTestsDirectory = path.join(projectDirectory, "webtests");
+        const selectedFileName = path.basename(selectedFile);
+        const packagedWebTestFile = path.join(outputDirectory, "webtests", selectedFileName);
+
+        // Compilazione del progetto e preparazione del pacchetto prima di contattare l'Host.
+        runOutput.appendLine(`Compiling WebTest project: ${projectPath}`);
+        runOutput.appendLine(`Package directory: ${outputDirectory}`);
+        await fs.mkdir(outputDirectory, { recursive: true });
+        const buildResult = await new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
+          execFile(
+            "dotnet",
+            ["build", projectPath, "--configuration", "Debug", "--output", outputDirectory],
+            { cwd: projectDirectory, maxBuffer: 10 * 1024 * 1024 },
+            (error, stdout, stderr) => {
+              if (error) {
+                const details = [stdout, stderr].filter(Boolean).join("\\n");
+                reject(new Error(details || error.message));
+                return;
+              }
+              resolve({ stdout, stderr });
+            }
+          );
+        });
+        if (buildResult.stdout) runOutput.append(buildResult.stdout);
+        if (buildResult.stderr) runOutput.append(buildResult.stderr);
+
+        await fs.mkdir(path.dirname(packagedWebTestFile), { recursive: true });
+        await fs.copyFile(selectedFile, packagedWebTestFile);
+        runOutput.appendLine("WebTest package compiled and prepared.");
+
         // Avvia il processo Host e inizializza JSON-RPC.
         if (!hostManager.isRunning) await hostManager.start();
         if (!communicationClient.isInitialized) await communicationClient.initialize();
 
         // Il debugger è opzionale: un problema di attach non deve impedire il WebTest.
-        // Quando l'attach riesce, i breakpoint sono attivi prima di inviare webtest.run.
         try {
           await hostDebugger.attach();
           runOutput.appendLine(`C# debugger attached to DeoLoadTest Host (PID ${hostManager.processId}).`);
@@ -340,8 +402,9 @@ export function activate(context: vscode.ExtensionContext): void {
           );
         }
 
-        // Compila i passi C# con Portable PDB per consentire i breakpoint CLR.
-        const result = await communicationClient.startWebTest(selection[0].fsPath, true);
+        const relativeWebTestFile = path.relative(outputDirectory, packagedWebTestFile);
+        runOutput.appendLine(`Loading WebTest package: ${outputDirectory}`);
+        const result = await communicationClient.startWebTest(outputDirectory, relativeWebTestFile, true);
         activeRunId = result.runId;
         activeWebTestRunId = result.runId;
         const testName = selection[0].fsPath.split(/[\\\\/]/).pop()?.replace(/\\.webtest\\.(yaml|yml)$/i, "") ?? selection[0].fsPath;
