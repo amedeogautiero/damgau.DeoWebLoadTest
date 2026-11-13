@@ -154,6 +154,18 @@ export function activate(context: vscode.ExtensionContext): void {
   let webTestSuccessfulRequests = 0;
   let webTestFailedRequests = 0;
 
+  const stopWebTestHostAfterRun = async (): Promise<void> => {
+    if (!hostManager.isRunning) return;
+    communicationClient.resetInitialization();
+    try {
+      await hostManager.stop();
+      runOutput.appendLine("WebTest Host shut down after execution.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      runOutput.appendLine(`Unable to shut down WebTest Host: ${message}`);
+    }
+  };
+
   const notificationSubscription = communicationClient.onNotification((notification) => {
     if (!notification.method.startsWith("run.") && !notification.method.startsWith("webtest.")) return;
 
@@ -274,6 +286,7 @@ export function activate(context: vscode.ExtensionContext): void {
         activeRunId = undefined;
         activeWebTestRunId = undefined;
         void vscode.commands.executeCommand("setContext", "deoloadtest.webTestRunning", false);
+        void stopWebTestHostAfterRun();
         if (result.success) {
           void vscode.window.showInformationMessage("WebTest completed successfully.");
         } else {
@@ -292,6 +305,7 @@ export function activate(context: vscode.ExtensionContext): void {
         activeRunId = undefined;
         activeWebTestRunId = undefined;
         void vscode.commands.executeCommand("setContext", "deoloadtest.webTestRunning", false);
+        void stopWebTestHostAfterRun();
         void vscode.window.showErrorMessage(
           `WebTest execution failed: ${params.error?.message ?? "Unknown error"}`
         );
@@ -306,6 +320,7 @@ export function activate(context: vscode.ExtensionContext): void {
         activeRunId = undefined;
         activeWebTestRunId = undefined;
         void vscode.commands.executeCommand("setContext", "deoloadtest.webTestRunning", false);
+        void stopWebTestHostAfterRun();
         void vscode.window.showInformationMessage("WebTest cancelled.");
         break;
       default:
@@ -439,6 +454,13 @@ export function activate(context: vscode.ExtensionContext): void {
         runOutput.appendLine(`Compiling WebTest project: ${projectPath}`);
         runOutput.appendLine(`Package directory: ${outputDirectory}`);
         await fs.mkdir(outputDirectory, { recursive: true });
+        // Ogni Run WebTest usa un processo Host dedicato: rilascia il package
+        // della Run precedente prima di ricreare temp.pkg.
+        if (hostManager.isRunning) {
+          communicationClient.resetInitialization();
+          await hostManager.stop();
+        }
+
         const buildResult = await buildWebTestPackage(projectPath, outputDirectory);
         if (buildResult.stdout) runOutput.append(buildResult.stdout);
         if (buildResult.stderr) runOutput.append(buildResult.stderr);
