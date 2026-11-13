@@ -10,6 +10,8 @@ export interface DebugStep {
   readonly completedAt?: string;
   readonly details?: unknown;
   readonly requestId?: number;
+  readonly method?: string;
+  readonly url?: string;
 }
 
 export interface WebTestExecutionEvent {
@@ -217,7 +219,7 @@ export class WebTestDebugSession {
   }
 
   private addStep(type: DebugStepType, name: string, status: DebugStep["status"], startedAt?: string, completedAt?: string, event?: WebTestExecutionEvent, requestId?: number): void {
-    this.stepItems.push({ id: this.nextStepId++, type, name, status, startedAt, completedAt, details: event?.stepDetails, requestId });
+    this.stepItems.push({ id: this.nextStepId++, type, name, status, startedAt, completedAt, details: event?.stepDetails, requestId, method: event?.method, url: event?.url });
   }
 
   private findPendingStep(type: DebugStepType, name: string): number {
@@ -230,7 +232,7 @@ export class WebTestDebugSession {
   private updateStep(index: number, event: WebTestExecutionEvent): void {
     const previous = this.stepItems[index];
     const status = event.stepStatus === "Failed" ? "failed" : event.stepStatus === "Succeeded" ? "succeeded" : previous.status;
-    this.stepItems[index] = { ...previous, status, completedAt: event.stepStatus === "Started" ? previous.completedAt : event.timestampUtc, details: event.stepDetails ?? previous.details };
+    this.stepItems[index] = { ...previous, status, completedAt: event.stepStatus === "Started" ? previous.completedAt : event.timestampUtc, details: event.stepDetails ?? previous.details, method: event.method ?? previous.method, url: event.url ?? previous.url };
   }
 
   private completeRequest(event: WebTestExecutionEvent, status: "succeeded" | "failed"): void {
