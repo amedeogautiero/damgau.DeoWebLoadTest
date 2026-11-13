@@ -27,7 +27,8 @@
     "onCommand:deoloadtest.showDebugPanel",
     "onCommand:deoloadtest.showVerticalDebugPanel",
     "onCommand:deoloadtest.compileWebTest",
-    "onCommand:deoloadtest.showDeoLoadTestView"
+    "onCommand:deoloadtest.showDeoLoadTestView",
+    "onView:deoloadtest.mainView"
   ],
   "main": "./out/extension.js",
   "contributes": {
