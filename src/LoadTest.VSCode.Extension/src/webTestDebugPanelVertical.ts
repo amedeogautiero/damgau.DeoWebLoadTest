@@ -96,10 +96,15 @@ export class WebTestDebugPanelVertical implements vscode.Disposable, vscode.Webv
       this.onHostStart();
     } else if (message?.command === "hostStop") {
       this.onHostStop();
-    } else if (message?.command === "select" && Number.isInteger(message.requestId)) {
-      this.selectedRequestId = message.requestId;
-      const request = this.sentRequests.get(this.selectedRequestId) ?? null;
-      this.lastSentSelectedRequestId = this.selectedRequestId;
+    } else if (
+      message?.command === "select" &&
+      typeof message.requestId === "number" &&
+      Number.isInteger(message.requestId)
+    ) {
+      const requestId: number = message.requestId;
+      this.selectedRequestId = requestId;
+      const request = this.sentRequests.get(requestId) ?? null;
+      this.lastSentSelectedRequestId = requestId;
       this.lastSentSelectedRequest = request;
       void this.webview?.postMessage({ command: "selectedRequest", request });
     }
