@@ -47,8 +47,6 @@ async function buildWebTestPackage(
   const sdkProjectPath = path.resolve(projectDirectory, "..", "LoadTest.Sdk", "LoadTest.Sdk.csproj");
   const buildDirectory = path.join(projectDirectory, "obj", "DeoLoadTest.WebTestBuild");
   const generatedProjectPath = path.join(buildDirectory, "WebTest.CodeSteps.csproj");
-  const intermediateDirectory = path.join(buildDirectory, "obj");
-
   // Elimina l'output precedente: evita che DLL xUnit o artefatti di una build normale
   // vengano inclusi accidentalmente nel pacchetto caricato dall'Host.
   await fs.rm(outputDirectory, { recursive: true, force: true });
@@ -63,8 +61,6 @@ async function buildWebTestPackage(
     '    <AssemblyName>LoadTest.WebTestSample.CodeSteps</AssemblyName>',
     '    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>',
     '    <EnableDefaultItems>false</EnableDefaultItems>',
-    '    <BaseIntermediateOutputPath>' + xml(intermediateDirectory + path.sep) + '</BaseIntermediateOutputPath>',
-    '    <MSBuildProjectExtensionsPath>' + xml(intermediateDirectory + path.sep) + '</MSBuildProjectExtensionsPath>',
     '    <Nullable>enable</Nullable>',
     '    <ImplicitUsings>enable</ImplicitUsings>',
     '    <LangVersion>latest</LangVersion>',
