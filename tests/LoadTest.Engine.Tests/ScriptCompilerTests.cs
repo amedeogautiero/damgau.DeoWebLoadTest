@@ -3,7 +3,8 @@ using LoadTest.Plugins.Compilation;
 using LoadTest.Sdk;
 using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
-using Microsoft.CodeAnalysis.Text;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using System.Text;
 
 namespace LoadTest.Engine.Tests;
@@ -161,7 +162,9 @@ public class ScriptCompilerTests
                 new Guid("ff1816ec-aa5e-4d10-87f7-6f4963833460"),
                 reader.GetGuid(document.HashAlgorithm));
 
-            var expectedHash = SourceText.From(File.ReadAllText(sourcePath), Encoding.UTF8, SourceHashAlgorithm.Sha1).GetChecksum().ToArray();
+            var parseOptions = new CSharpParseOptions(LanguageVersion.Latest, DocumentationMode.None, SourceCodeKind.Regular);
+            var sourceTree = CSharpSyntaxTree.ParseText(File.ReadAllText(sourcePath), parseOptions, path: sourcePath, encoding: Encoding.UTF8);
+            var expectedHash = sourceTree.GetText().GetChecksum().ToArray();
             var actualHash = reader.GetBlobBytes(document.Hash);
             Assert.Equal(expectedHash, actualHash);
 
