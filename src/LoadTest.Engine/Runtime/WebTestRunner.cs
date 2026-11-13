@@ -369,35 +369,34 @@ public sealed class WebTestRunner(EngineServices services)
         void Run(string name, IExtractionRule rule, IReadOnlyDictionary<string, string> args, bool required)
         {
             EmitStepEvent("StepStarted", "Extractor", name, "Started", f, new { requestName = step.Name, arguments = args });
-            ExtractionResult r;
             try
             {
-                r = rule.Extract(req, resp, args);
+                var r = rule.Extract(req, resp, args);
+                EmitStepEvent("StepCompleted", "Extractor", name,
+                    r.Success && r.Value is not null ? "Succeeded" : required ? "Failed" : "Succeeded", f,
+                    new { requestName = step.Name, success = r.Success, message = r.Message, value = r.Value });
+                if (r.Success && r.Value is not null)
+                {
+                    f.Ctx.Parameters[name] = r.Value;
+                    Emit(new ExecutionEvent
+                    {
+                        EventType = "VariablesUpdated",
+                        ScenarioName = f.Ctx.User.ScenarioName,
+                        TestName = f.Ctx.TestName,
+                        UserId = f.Ctx.User.UserId,
+                        Iteration = f.Ctx.Iteration,
+                        RequestName = step.Name,
+                        VariableName = name,
+                        VariableValue = r.Value
+                    });
+                }
+                else if (required) failures.Add($"estrazione '{name}': {r.Message}");
             }
             catch (Exception ex)
             {
                 EmitStepEvent("StepCompleted", "Extractor", name, "Failed", f, new { requestName = step.Name, error = ex.Message });
                 throw;
             }
-            EmitStepEvent("StepCompleted", "Extractor", name,
-                r.Success && r.Value is not null ? "Succeeded" : required ? "Failed" : "Succeeded", f,
-                new { requestName = step.Name, success = r.Success, message = r.Message, value = r.Value });
-            if (r.Success && r.Value is not null)
-            {
-                f.Ctx.Parameters[name] = r.Value;
-                Emit(new ExecutionEvent
-                {
-                    EventType = "VariablesUpdated",
-                    ScenarioName = f.Ctx.User.ScenarioName,
-                    TestName = f.Ctx.TestName,
-                    UserId = f.Ctx.User.UserId,
-                    Iteration = f.Ctx.Iteration,
-                    RequestName = step.Name,
-                    VariableName = name,
-                    VariableValue = r.Value
-                });
-            }
-            else if (required) failures.Add($"estrazione '{name}': {r.Message}");
         }
 
         foreach (var e in step.Extract)
