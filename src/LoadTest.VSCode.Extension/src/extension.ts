@@ -37,6 +37,65 @@ interface RunNotificationParams {
   error?: { code?: string; message?: string; details?: string };
 }
 
+
+async function buildWebTestPackage(
+  projectPath: string,
+  outputDirectory: string
+): Promise<{ stdout: string; stderr: string }> {
+  const projectDirectory = path.dirname(projectPath);
+  const scriptsDirectory = path.join(projectDirectory, "Scripts");
+  const sdkProjectPath = path.resolve(projectDirectory, "..", "LoadTest.Sdk", "LoadTest.Sdk.csproj");
+  const buildDirectory = path.join(projectDirectory, "obj", "DeoLoadTest.WebTestBuild");
+  const generatedProjectPath = path.join(buildDirectory, "WebTest.CodeSteps.csproj");
+  const intermediateDirectory = path.join(buildDirectory, "obj");
+
+  // Elimina l'output precedente: evita che DLL xUnit o artefatti di una build normale
+  // vengano inclusi accidentalmente nel pacchetto caricato dall'Host.
+  await fs.rm(outputDirectory, { recursive: true, force: true });
+  await fs.mkdir(buildDirectory, { recursive: true });
+  await fs.mkdir(outputDirectory, { recursive: true });
+
+  const xml = (value: string) => value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const generatedProject = [
+    '<Project Sdk="Microsoft.NET.Sdk">',
+    '  <PropertyGroup>',
+    '    <TargetFramework>net10.0</TargetFramework>',
+    '    <AssemblyName>LoadTest.WebTestSample.CodeSteps</AssemblyName>',
+    '    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>',
+    '    <EnableDefaultItems>false</EnableDefaultItems>',
+    '    <BaseIntermediateOutputPath>' + xml(intermediateDirectory + path.sep) + '</BaseIntermediateOutputPath>',
+    '    <MSBuildProjectExtensionsPath>' + xml(intermediateDirectory + path.sep) + '</MSBuildProjectExtensionsPath>',
+    '    <Nullable>enable</Nullable>',
+    '    <ImplicitUsings>enable</ImplicitUsings>',
+    '    <LangVersion>latest</LangVersion>',
+    '  </PropertyGroup>',
+    '  <ItemGroup>',
+    '    <Compile Include="' + xml(path.join(scriptsDirectory, "**", "*.cs")) + '" />',
+    '    <ProjectReference Include="' + xml(sdkProjectPath) + '" />',
+    '  </ItemGroup>',
+    '</Project>',
+    ''
+  ].join("\\n");
+
+  await fs.writeFile(generatedProjectPath, generatedProject, "utf8");
+
+  return await new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
+    execFile(
+      "dotnet",
+      ["build", generatedProjectPath, "--configuration", "Debug", "--output", outputDirectory],
+      { cwd: projectDirectory, maxBuffer: 10 * 1024 * 1024 },
+      (error, stdout, stderr) => {
+        if (error) {
+          const details = [stdout, stderr].filter(Boolean).join("\\n");
+          reject(new Error(details || error.message));
+          return;
+        }
+        resolve({ stdout, stderr });
+      }
+    );
+  });
+}
+
 export function activate(context: vscode.ExtensionContext): void {
   const hostManager = new HostManager(context.extensionUri.fsPath);
   const communicationClient = new CommunicationClient(hostManager);
@@ -364,21 +423,7 @@ export function activate(context: vscode.ExtensionContext): void {
         runOutput.appendLine(`Compiling WebTest project: ${projectPath}`);
         runOutput.appendLine(`Package directory: ${outputDirectory}`);
         await fs.mkdir(outputDirectory, { recursive: true });
-        const buildResult = await new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
-          execFile(
-            "dotnet",
-            ["build", projectPath, "--configuration", "Debug", "--output", outputDirectory],
-            { cwd: projectDirectory, maxBuffer: 10 * 1024 * 1024 },
-            (error, stdout, stderr) => {
-              if (error) {
-                const details = [stdout, stderr].filter(Boolean).join("\\n");
-                reject(new Error(details || error.message));
-                return;
-              }
-              resolve({ stdout, stderr });
-            }
-          );
-        });
+        const buildResult = await buildWebTestPackage(projectPath, outputDirectory);
         if (buildResult.stdout) runOutput.append(buildResult.stdout);
         if (buildResult.stderr) runOutput.append(buildResult.stderr);
 
@@ -551,21 +596,7 @@ export function activate(context: vscode.ExtensionContext): void {
       try {
         await fs.mkdir(outputDirectory, { recursive: true });
 
-        const buildResult = await new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
-          execFile(
-            "dotnet",
-            ["build", projectPath, "--configuration", "Debug", "--output", outputDirectory],
-            { cwd: projectDirectory, maxBuffer: 10 * 1024 * 1024 },
-            (error, stdout, stderr) => {
-              if (error) {
-                const details = [stdout, stderr].filter(Boolean).join("\n");
-                reject(new Error(details || error.message));
-                return;
-              }
-              resolve({ stdout, stderr });
-            }
-          );
-        });
+        const buildResult = await buildWebTestPackage(projectPath, outputDirectory);
 
         if (buildResult.stdout) runOutput.append(buildResult.stdout);
         if (buildResult.stderr) runOutput.append(buildResult.stderr);
