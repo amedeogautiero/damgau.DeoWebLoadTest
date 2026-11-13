@@ -194,6 +194,7 @@ export class WebTestDebugPanelVertical implements vscode.Disposable, vscode.Webv
       maxMs: durationCount ? this.durationMaxMs : null,
       failures: this.session.summary?.failures ?? [],
       requests: changedRequests,
+      steps: this.session.steps,
       resetRequests,
       ...(selectedChanged ? { selectedRequest } : {})
     });
@@ -241,12 +242,12 @@ export class WebTestDebugPanelVertical implements vscode.Disposable, vscode.Webv
 </header>
 <main>
   <section class="explorer">
-    <div class="section-heading">REQUEST EXPLORER <span id="request-count">0</span></div>
+    <div class="section-heading">EXECUTION STEPS <span id="request-count">0</span></div>
     <div class="request-list" id="request-list"></div>
   </section>
   <section class="inspector">
     <div class="section-heading">REQUEST INSPECTOR</div>
-    <div id="inspector-content" class="inspector-content"><div class="empty">Select a request to inspect its details.</div></div>
+    <div id="inspector-content" class="inspector-content"><div class="empty">Select a Request step to inspect its details.</div></div>
   </section>
 </main>
 <section class="summary">
@@ -343,6 +344,31 @@ export class WebTestDebugPanelVertical implements vscode.Disposable, vscode.Webv
       rows.delete(slot);
     }
     allocatedSlots = requestCount;
+  }
+
+  function renderSteps(steps) {
+    list.replaceChildren();
+    rows.clear();
+    allocatedSlots = 0;
+    const icons = { Request: "🌐", Code: "C#", Extractor: "🔍", Validator: "✓" };
+    steps.forEach(step => {
+      const row = element("button", "request-row");
+      row.type = "button";
+      if (step.requestId) row.dataset.select = String(step.requestId);
+      const main = element("span", "request-main");
+      main.appendChild(element("span", "step-icon", icons[step.type] || "•"));
+      main.appendChild(element("strong", "step-type", step.type));
+      main.appendChild(element("span", "request-url", step.name));
+      const meta = element("span", "request-meta");
+      const status = step.status === "succeeded" ? "Succeeded" : step.status === "failed" ? "Failed" : "Running";
+      meta.appendChild(element("span", step.status === "succeeded" ? "success" : step.status === "failed" ? "failure" : "muted", status));
+      if (step.startedAt) meta.appendChild(element("span", "request-duration", new Date(step.startedAt).toLocaleTimeString()));
+      row.append(main, meta);
+      list.appendChild(row);
+      if (step.requestId) rows.set(step.requestId, row);
+    });
+    document.getElementById("request-count").textContent = String(steps.length);
+    selectedRequestId = selectedRequestId;
   }
 
   function updateRow(request, slot) {
@@ -541,16 +567,8 @@ export class WebTestDebugPanelVertical implements vscode.Disposable, vscode.Webv
       return;
     }
     if (message?.command !== "state") return;
-    if (message.resetRequests) {
-      list.replaceChildren();
-      rows.clear();
-      allocatedSlots = 0;
-      ensureCapacity(0);
-    } else {
-      ensureCapacity(message.visibleRequests || 0);
-    }
     sessionStartedAt = message.startedAt === "—" ? null : message.startedAt;
-    (message.requests || []).forEach(item => updateRow(item.request, item.slot));
+    renderSteps(message.steps || []);
     if (["completed", "failed", "cancelled"].includes(message.status)) {
       trimEmptySlots(message.visibleRequests || 0);
     }
