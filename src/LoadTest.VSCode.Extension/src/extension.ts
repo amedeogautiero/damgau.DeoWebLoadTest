@@ -214,14 +214,20 @@ export function activate(context: vscode.ExtensionContext): void {
       case "webtest.event": {
         const event = params.event ?? {};
         webTestDebugSession.applyExecutionEvent(event);
-        if (event.eventType === "RequestStarted" || event.eventType === "RequestCompleted" || event.eventType === "RequestFailed") {
+        const isRequestEvent = event.stepType === "Request" ||
+          event.eventType === "RequestStarted" ||
+          event.eventType === "RequestCompleted" ||
+          event.eventType === "RequestFailed";
+        if (isRequestEvent) {
           requestExplorer.refresh();
-          const latestRequest = webTestDebugSession.requests[webTestDebugSession.requests.length - 1];
           requestInspector.update(webTestDebugSession.requests);
           timingInspector.update(webTestDebugSession.requests, webTestDebugSession.status);
           debugPanel.update();
-          verticalDebugPanel.update(latestRequest?.id);
         }
+        // Every execution event refreshes the ordered step stream, including Code,
+        // Extractor and Validator events that do not represent HTTP requests.
+        const latestRequest = webTestDebugSession.requests[webTestDebugSession.requests.length - 1];
+        verticalDebugPanel.update(latestRequest?.id);
         if (event.eventType === "RequestCompleted" || event.eventType === "RequestFailed") {
           const success = event.eventType === "RequestCompleted";
           if (success) webTestSuccessfulRequests++;
