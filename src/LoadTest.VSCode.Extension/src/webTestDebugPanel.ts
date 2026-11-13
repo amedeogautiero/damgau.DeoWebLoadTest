@@ -11,6 +11,7 @@ export class WebTestDebugPanel implements vscode.Disposable {
   constructor(
     private readonly session: WebTestDebugSession,
     private readonly onRun: () => void,
+    private readonly onDebug: () => void,
     private readonly onStop: () => void,
     private readonly onClear: () => void
   ) {}
@@ -26,6 +27,7 @@ export class WebTestDebugPanel implements vscode.Disposable {
       );
       this.panel.webview.onDidReceiveMessage(message => {
         if (message?.command === "run") this.onRun();
+        else if (message?.command === "debug") this.onDebug();
         else if (message?.command === "stop") this.onStop();
         else if (message?.command === "clear") this.onClear();
         else if (message?.command === "select" && Number.isInteger(message.requestId)) {
@@ -95,6 +97,7 @@ export class WebTestDebugPanel implements vscode.Disposable {
       '<style>' + this.styles() + '</style></head><body>' +
       '<header><div><h1>DeoLoadTest Debug Panel</h1><div class="test-name">' + this.escape(this.session.testName ?? "No WebTest selected") + '</div></div>' +
       '<div class="toolbar"><button id="run" ' + (running ? "disabled" : "") + '>▶ Run</button>' +
+      '<button id="debug" ' + (running ? "disabled" : "") + '>🐞 Debug</button>' +
       '<button id="stop" class="danger" ' + (!running ? "disabled" : "") + '>■ Stop</button>' +
       '<button id="clear" ' + (requests.length ? "" : "disabled") + '>Clear</button>' +
       '<span class="status ' + statusClass + '"><i></i>' + statusLabel + '</span></div></header>' +
@@ -116,6 +119,7 @@ export class WebTestDebugPanel implements vscode.Disposable {
       '</section><script>' +
       'const vscode = acquireVsCodeApi();' +
       'document.getElementById("run").addEventListener("click",()=>vscode.postMessage({command:"run"}));' +
+      'document.getElementById("debug").addEventListener("click",()=>vscode.postMessage({command:"debug"}));' +
       'document.getElementById("stop").addEventListener("click",()=>vscode.postMessage({command:"stop"}));' +
       'document.getElementById("clear").addEventListener("click",()=>vscode.postMessage({command:"clear"}));' +
       'document.querySelectorAll("[data-select]").forEach(x=>x.addEventListener("click",()=>vscode.postMessage({command:"select",requestId:Number(x.dataset.select)})));' +
