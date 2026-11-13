@@ -45,6 +45,10 @@ async function buildWebTestPackage(
   const projectDirectory = path.dirname(projectPath);
   const buildOutputDirectory = path.join(projectDirectory, "bin", "Debug", "net10.0");
 
+  // temp.pkg è dentro la directory del progetto: va rimosso PRIMA della build,
+  // altrimenti il glob Compile predefinito include anche i .cs già copiati lì.
+  await fs.rm(outputDirectory, { recursive: true, force: true });
+
   // Usa la build standard del progetto originale: MSBuild risolve tutte le
   // ProjectReference e PackageReference, incluse le dipendenze dei Code Step.
   const buildResult = await new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
@@ -65,7 +69,6 @@ async function buildWebTestPackage(
 
   // temp.pkg riproduce il contenuto distribuibile: parte dall'output completo
   // della build normale e rimuove esclusivamente gli artefatti del test runner.
-  await fs.rm(outputDirectory, { recursive: true, force: true });
   await fs.mkdir(outputDirectory, { recursive: true });
 
   const excludedRuntimeFiles = /^(xunit(?:\.|$)|Microsoft\.TestPlatform(?:\.|$)|testhost(?:\.|$)|coverlet(?:\.|$)|Microsoft\.CodeCoverage(?:\.|$))/i;
