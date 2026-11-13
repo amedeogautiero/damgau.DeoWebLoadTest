@@ -514,6 +514,7 @@ export function activate(context: vscode.ExtensionContext): void {
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         runOutput.appendLine(`Unable to start WebTest: ${message}`);
+        void stopWebTestHostAfterRun();
         void vscode.window.showErrorMessage(`Unable to start WebTest: ${message}`);
       }
     }
