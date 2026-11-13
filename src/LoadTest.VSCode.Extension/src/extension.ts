@@ -742,6 +742,7 @@ export function activate(context: vscode.ExtensionContext): void {
     startHostCommand,
     runLoadTestCommand,
     runWebTestCommand,
+    debugWebTestCommand,
     compileScriptCommand,
     compileWebTestCommand,
     stopWebTestCommand,
