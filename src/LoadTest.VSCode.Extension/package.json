@@ -107,12 +107,22 @@
           "name": "DeoLoadTest - Request Explorer",
           "when": "true"
         }
+      ],
+      "deoloadtest": [
+        {
+          "id": "deoloadtest.mainView",
+          "name": "DeoLoadTest"
+        }
       ]
     },
     "viewsWelcome": [
       {
         "view": "deoloadtest.requestExplorer",
         "contents": "Run a WebTest to inspect its HTTP requests.\n[Run WebTest](command:deoloadtest.runWebTest)"
+      },
+      {
+        "view": "deoloadtest.mainView",
+        "contents": "Welcome to DeoLoadTest.\n[Open DeoLoadTest Panel](command:deoloadtest.showVerticalDebugPanel)"
       }
     ],
     "menus": {
@@ -140,7 +150,16 @@
         "key": "f5",
         "when": "editorTextFocus && resourceExtname == .csx && !deoloadtest.webTestRunning"
       }
-    ]
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "deoloadtest",
+          "title": "DeoLoadTest",
+          "icon": "./resources/deoloadtest-activity.svg"
+        }
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
