@@ -128,12 +128,14 @@ export function activate(context: vscode.ExtensionContext): void {
   const debugPanel = new WebTestDebugPanel(
     webTestDebugSession,
     () => { void vscode.commands.executeCommand("deoloadtest.runWebTest"); },
+    () => { void vscode.commands.executeCommand("deoloadtest.debugWebTest"); },
     () => { void vscode.commands.executeCommand("deoloadtest.stopWebTest"); },
     () => { void vscode.commands.executeCommand("deoloadtest.clearRequestExplorer"); }
   );
   const verticalDebugPanel = new WebTestDebugPanelVertical(
     webTestDebugSession,
     () => { void vscode.commands.executeCommand("deoloadtest.runWebTest"); },
+    () => { void vscode.commands.executeCommand("deoloadtest.debugWebTest"); },
     () => { void vscode.commands.executeCommand("deoloadtest.stopWebTest"); },
     () => { void vscode.commands.executeCommand("deoloadtest.clearRequestExplorer"); },
     () => { void vscode.commands.executeCommand("deoloadtest.startHost"); },
@@ -387,9 +389,7 @@ export function activate(context: vscode.ExtensionContext): void {
     }
   );
 
-  const runWebTestCommand = vscode.commands.registerCommand(
-    "deoloadtest.runWebTest",
-    async () => {
+  const executeWebTest = async (attachDebugger: boolean): Promise<void> => {
       if (webTestDebugSession.status === "running") {
         void vscode.window.showWarningMessage("A WebTest is already running.");
         return;
@@ -487,16 +487,19 @@ export function activate(context: vscode.ExtensionContext): void {
         if (!hostManager.isRunning) await hostManager.start();
         if (!communicationClient.isInitialized) await communicationClient.initialize();
 
-        // Il debugger è opzionale: un problema di attach non deve impedire il WebTest.
-        try {
-          await hostDebugger.attach();
-          runOutput.appendLine(`C# debugger attached to DeoLoadTest Host (PID ${hostManager.processId}).`);
-        } catch (debugError) {
-          const debugMessage = debugError instanceof Error ? debugError.message : String(debugError);
-          runOutput.appendLine(`C# debugger attach failed; continuing without debugger: ${debugMessage}`);
-          void vscode.window.showWarningMessage(
-            `WebTest will run without C# debugging: ${debugMessage}`
-          );
+        if (attachDebugger) {
+          try {
+            await hostDebugger.attach();
+            runOutput.appendLine(`C# debugger attached to DeoLoadTest Host (PID ${hostManager.processId}).`);
+          } catch (debugError) {
+            const debugMessage = debugError instanceof Error ? debugError.message : String(debugError);
+            runOutput.appendLine(`C# debugger attach failed; continuing without debugger: ${debugMessage}`);
+            void vscode.window.showWarningMessage(
+              `WebTest will run without C# debugging: ${debugMessage}`
+            );
+          }
+        } else {
+          runOutput.appendLine("Running without C# debugger.");
         }
 
         const relativeWebTestFile = path.relative(outputDirectory, packagedWebTestFile);
@@ -517,7 +520,16 @@ export function activate(context: vscode.ExtensionContext): void {
         void stopWebTestHostAfterRun();
         void vscode.window.showErrorMessage(`Unable to start WebTest: ${message}`);
       }
-    }
+  };
+
+  const runWebTestCommand = vscode.commands.registerCommand(
+    "deoloadtest.runWebTest",
+    () => executeWebTest(false)
+  );
+
+  const debugWebTestCommand = vscode.commands.registerCommand(
+    "deoloadtest.debugWebTest",
+    () => executeWebTest(true)
   );
 
   const stopWebTestCommand = vscode.commands.registerCommand(
