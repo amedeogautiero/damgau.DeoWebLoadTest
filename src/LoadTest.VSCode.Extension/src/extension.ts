@@ -1,4 +1,7 @@
 import * as vscode from "vscode";
+import { execFile } from "child_process";
+import * as fs from "fs/promises";
+import * as path from "path";
 import { CommunicationClient, HostNotification } from "./communicationClient";
 import { HostManager } from "./hostManager";
 import { HostDebugger } from "./hostDebugger";
@@ -425,6 +428,105 @@ export function activate(context: vscode.ExtensionContext): void {
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         void vscode.window.showErrorMessage(`Unable to import HAR: ${message}`);
+      }
+    }
+  );
+
+  const compileWebTestCommand = vscode.commands.registerCommand(
+    "deoloadtest.compileWebTest",
+    async () => {
+      const projects = await vscode.workspace.findFiles(
+        "**/LoadTest.WebTestSample.csproj",
+        "**/{bin,obj,node_modules}/**"
+      );
+
+      if (projects.length === 0) {
+        void vscode.window.showErrorMessage(
+          "LoadTest.WebTestSample.csproj was not found in the current workspace."
+        );
+        return;
+      }
+
+      let projectUri = projects[0];
+      if (projects.length > 1) {
+        const selected = await vscode.window.showQuickPick(
+          projects.map(uri => ({
+            label: path.basename(path.dirname(uri.fsPath)),
+            description: vscode.workspace.asRelativePath(uri),
+            uri
+          })),
+          { placeHolder: "Select the WebTest project to compile" }
+        );
+        if (!selected) return;
+        projectUri = selected.uri;
+      }
+
+      const projectPath = projectUri.fsPath;
+      const projectDirectory = path.dirname(projectPath);
+      const outputDirectory = path.join(projectDirectory, "bin", "WebTest");
+      const webTestsDirectory = path.join(projectDirectory, "webtests");
+
+      runOutput.show(true);
+      runOutput.appendLine("");
+      runOutput.appendLine(`Compiling WebTest project: ${projectPath}`);
+      runOutput.appendLine(`Destination: ${outputDirectory}`);
+
+      try {
+        await fs.mkdir(outputDirectory, { recursive: true });
+
+        const buildResult = await new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
+          execFile(
+            "dotnet",
+            ["build", projectPath, "--configuration", "Debug", "--output", outputDirectory],
+            { cwd: projectDirectory, maxBuffer: 10 * 1024 * 1024 },
+            (error, stdout, stderr) => {
+              if (error) {
+                const details = [stdout, stderr].filter(Boolean).join("\\n");
+                reject(new Error(details || error.message));
+                return;
+              }
+              resolve({ stdout, stderr });
+            }
+          );
+        });
+
+        if (buildResult.stdout) runOutput.append(buildResult.stdout);
+        if (buildResult.stderr) runOutput.append(buildResult.stderr);
+
+        let copiedYamlCount = 0;
+        try {
+          const entries = await fs.readdir(webTestsDirectory, { withFileTypes: true });
+          const yamlFiles = entries.filter(entry =>
+            entry.isFile() && /\\.webtest\\.ya?ml$/i.test(entry.name)
+          );
+
+          if (yamlFiles.length > 0) {
+            const destinationWebTests = path.join(outputDirectory, "webtests");
+            await fs.mkdir(destinationWebTests, { recursive: true });
+            for (const file of yamlFiles) {
+              await fs.copyFile(
+                path.join(webTestsDirectory, file.name),
+                path.join(destinationWebTests, file.name)
+              );
+              copiedYamlCount++;
+            }
+          }
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+          runOutput.appendLine("Webtests source directory not found; no YAML files were copied.");
+        }
+
+        runOutput.appendLine("");
+        runOutput.appendLine("WebTest compilation completed successfully.");
+        runOutput.appendLine(`Output directory: ${outputDirectory}`);
+        runOutput.appendLine(`YAML files copied: ${copiedYamlCount}`);
+        void vscode.window.showInformationMessage(
+          `WebTest compiled successfully. Output: ${path.relative(projectDirectory, outputDirectory)}`
+        );
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        runOutput.appendLine(`WebTest compilation failed: ${message}`);
+        void vscode.window.showErrorMessage(`WebTest compilation failed: ${message}`);
       }
     }
   );
