@@ -43,46 +43,18 @@ async function buildWebTestPackage(
   outputDirectory: string
 ): Promise<{ stdout: string; stderr: string }> {
   const projectDirectory = path.dirname(projectPath);
-  const scriptsDirectory = path.join(projectDirectory, "Scripts");
-  const sdkProjectPath = path.resolve(projectDirectory, "..", "LoadTest.Sdk", "LoadTest.Sdk.csproj");
-  const buildDirectory = path.join(projectDirectory, "obj", "DeoLoadTest.WebTestBuild");
-  const generatedProjectPath = path.join(buildDirectory, "WebTest.CodeSteps.csproj");
-  // Elimina l'output precedente: evita che DLL xUnit o artefatti di una build normale
-  // vengano inclusi accidentalmente nel pacchetto caricato dall'Host.
-  await fs.rm(outputDirectory, { recursive: true, force: true });
-  await fs.mkdir(buildDirectory, { recursive: true });
-  await fs.mkdir(outputDirectory, { recursive: true });
+  const buildOutputDirectory = path.join(projectDirectory, "bin", "Debug", "net10.0");
 
-  const xml = (value: string) => value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-  const generatedProject = [
-    '<Project Sdk="Microsoft.NET.Sdk">',
-    '  <PropertyGroup>',
-    '    <TargetFramework>net10.0</TargetFramework>',
-    '    <AssemblyName>LoadTest.WebTestSample.CodeSteps</AssemblyName>',
-    '    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>',
-    '    <EnableDefaultItems>false</EnableDefaultItems>',
-    '    <Nullable>enable</Nullable>',
-    '    <ImplicitUsings>enable</ImplicitUsings>',
-    '    <LangVersion>latest</LangVersion>',
-    '  </PropertyGroup>',
-    '  <ItemGroup>',
-    '    <Compile Include="' + xml(path.join(scriptsDirectory, "**", "*.cs")) + '" />',
-    '    <ProjectReference Include="' + xml(sdkProjectPath) + '" />',
-    '  </ItemGroup>',
-    '</Project>',
-    ''
-  ].join("\n");
-
-  await fs.writeFile(generatedProjectPath, generatedProject, "utf8");
-
-  return await new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
+  // Usa la build standard del progetto originale: MSBuild risolve tutte le
+  // ProjectReference e PackageReference, incluse le dipendenze dei Code Step.
+  const buildResult = await new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
     execFile(
       "dotnet",
-      ["build", generatedProjectPath, "--configuration", "Debug", "--output", outputDirectory],
+      ["build", projectPath, "--configuration", "Debug"],
       { cwd: projectDirectory, maxBuffer: 10 * 1024 * 1024 },
       (error, stdout, stderr) => {
         if (error) {
-          const details = [stdout, stderr].filter(Boolean).join("\n");
+          const details = [stdout, stderr].filter(Boolean).join("\\n");
           reject(new Error(details || error.message));
           return;
         }
@@ -90,6 +62,50 @@ async function buildWebTestPackage(
       }
     );
   });
+
+  // temp.pkg riproduce il contenuto distribuibile: parte dall'output completo
+  // della build normale e rimuove esclusivamente gli artefatti del test runner.
+  await fs.rm(outputDirectory, { recursive: true, force: true });
+  await fs.mkdir(outputDirectory, { recursive: true });
+
+  const excludedRuntimeFiles = /^(xunit(?:\\.|$)|Microsoft\\.TestPlatform(?:\\.|$)|testhost(?:\\.|$)|coverlet(?:\\.|$)|Microsoft\\.CodeCoverage(?:\\.|$))/i;
+  const copyRuntimeOutput = async (source: string, destination: string): Promise<void> => {
+    const entries = await fs.readdir(source, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isFile() && excludedRuntimeFiles.test(entry.name)) continue;
+      const sourcePath = path.join(source, entry.name);
+      const destinationPath = path.join(destination, entry.name);
+      if (entry.isDirectory()) {
+        await fs.mkdir(destinationPath, { recursive: true });
+        await copyRuntimeOutput(sourcePath, destinationPath);
+      } else if (entry.isFile()) {
+        await fs.copyFile(sourcePath, destinationPath);
+      }
+    }
+  };
+
+  try {
+    await copyRuntimeOutput(buildOutputDirectory, outputDirectory);
+  } catch (error) {
+    throw new Error(
+      `Standard build completed, but its output directory was not found: ${buildOutputDirectory}. ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+
+  // Copia i contenuti del WebTest che non fanno parte della compilazione.
+  for (const directoryName of ["Scripts", "datasources", "resources"]) {
+    const sourceDirectory = path.join(projectDirectory, directoryName);
+    try {
+      await fs.cp(sourceDirectory, path.join(outputDirectory, directoryName), {
+        recursive: true,
+        force: true
+      });
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    }
+  }
+
+  return buildResult;
 }
 
 export function activate(context: vscode.ExtensionContext): void {
@@ -410,7 +426,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
         const projectPath = projectUri.fsPath;
         const projectDirectory = path.dirname(projectPath);
-        const outputDirectory = path.join(projectDirectory, "bin", "WebTest");
+        const outputDirectory = path.join(projectDirectory, "temp.pkg");
         const webTestsDirectory = path.join(projectDirectory, "webtests");
         const selectedFileName = path.basename(selectedFile);
         const packagedWebTestFile = path.join(outputDirectory, "webtests", selectedFileName);
@@ -581,7 +597,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
       const projectPath = projectUri.fsPath;
       const projectDirectory = path.dirname(projectPath);
-      const outputDirectory = path.join(projectDirectory, "bin", "WebTest");
+      const outputDirectory = path.join(projectDirectory, "temp.pkg");
       const webTestsDirectory = path.join(projectDirectory, "webtests");
 
       runOutput.show(true);
