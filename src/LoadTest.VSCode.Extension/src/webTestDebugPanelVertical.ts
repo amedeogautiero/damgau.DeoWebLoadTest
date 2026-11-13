@@ -1,8 +1,10 @@
 import * as vscode from "vscode";
 import { DebugRequest, WebTestDebugSession } from "./webTestDebugSession";
 
-export class WebTestDebugPanelVertical implements vscode.Disposable {
+export class WebTestDebugPanelVertical implements vscode.Disposable, vscode.WebviewViewProvider {
   private panel: vscode.WebviewPanel | undefined;
+  private view: vscode.WebviewView | undefined;
+  private webview: vscode.Webview | undefined;
   private selectedRequestId: number | undefined;
   private disposed = false;
   private webviewReady = false;
@@ -24,6 +26,7 @@ export class WebTestDebugPanelVertical implements vscode.Disposable {
     private readonly onHostStop: () => void
   ) {}
 
+  // Legacy editor panel is intentionally retained as a fallback.
   show(): void {
     if (this.disposed) return;
     if (!this.panel) {
@@ -33,56 +36,90 @@ export class WebTestDebugPanelVertical implements vscode.Disposable {
         vscode.ViewColumn.Beside,
         { enableScripts: true, enableFindWidget: true, localResourceRoots: [] }
       );
-      this.webviewReady = false;
-      this.panel.webview.onDidReceiveMessage(message => {
-        if (message?.command === "ready") {
-          this.webviewReady = true;
-          this.sendSnapshot(true);
-        } else if (message?.command === "run") {
-          this.onRun();
-        } else if (message?.command === "debug") {
-          this.onDebug();
-        } else if (message?.command === "stop") {
-          this.onStop();
-        } else if (message?.command === "clear") {
-          this.onClear();
-        } else if (message?.command === "hostStart") {
-          this.onHostStart();
-        } else if (message?.command === "hostStop") {
-          this.onHostStop();
-        } else if (message?.command === "select" && Number.isInteger(message.requestId)) {
-          this.selectedRequestId = message.requestId;
-          const selectedRequestId = this.selectedRequestId;
-          const request = selectedRequestId === undefined
-            ? null
-            : this.sentRequests.get(selectedRequestId) ?? null;
-          this.lastSentSelectedRequestId = selectedRequestId;
-          this.lastSentSelectedRequest = request;
-          void this.panel?.webview.postMessage({ command: "selectedRequest", request });
+      const panel = this.panel;
+      const panelWebview = panel.webview;
+      this.webview = panelWebview;
+      this.attachWebview(panelWebview);
+      panel.onDidDispose(() => {
+        if (this.panel === panel) this.panel = undefined;
+        if (this.webview === panelWebview) {
+          this.webview = undefined;
+          this.resetWebviewState();
         }
       });
-      this.panel.onDidDispose(() => {
-        this.panel = undefined;
-        this.selectedRequestId = undefined;
-        this.webviewReady = false;
-        this.sentRequests.clear();
-        this.lastSentSelectedRequestId = undefined;
-        this.lastSentSelectedRequest = undefined;
-        this.resetDurationStats();
-      });
-      this.panel.webview.html = this.renderHtml();
     } else {
       this.panel.reveal(vscode.ViewColumn.Beside, true);
+      this.webview = this.panel.webview;
       if (this.webviewReady) this.sendSnapshot(true);
     }
   }
 
+  // New Activity Bar experience: render the same UI directly inside the sidebar.
+  resolveWebviewView(
+    webviewView: vscode.WebviewView,
+    _context: vscode.WebviewViewResolveContext,
+    _token: vscode.CancellationToken
+  ): void {
+    if (this.disposed) return;
+    this.view = webviewView;
+    this.webview = webviewView.webview;
+    webviewView.webview.options = { enableScripts: true, localResourceRoots: [] };
+    this.attachWebview(webviewView.webview);
+    webviewView.onDidDispose(() => {
+      if (this.view === webviewView) this.view = undefined;
+      if (this.webview === webviewView.webview) {
+        this.webview = undefined;
+        this.resetWebviewState();
+      }
+    });
+  }
+
+  private attachWebview(webview: vscode.Webview): void {
+    this.webviewReady = false;
+    webview.onDidReceiveMessage(message => this.handleMessage(message));
+    webview.html = this.renderHtml();
+  }
+
+  private handleMessage(message: any): void {
+    if (message?.command === "ready") {
+      this.webviewReady = true;
+      this.sendSnapshot(true);
+    } else if (message?.command === "run") {
+      this.onRun();
+    } else if (message?.command === "debug") {
+      this.onDebug();
+    } else if (message?.command === "stop") {
+      this.onStop();
+    } else if (message?.command === "clear") {
+      this.onClear();
+    } else if (message?.command === "hostStart") {
+      this.onHostStart();
+    } else if (message?.command === "hostStop") {
+      this.onHostStop();
+    } else if (message?.command === "select" && Number.isInteger(message.requestId)) {
+      this.selectedRequestId = message.requestId;
+      const request = this.sentRequests.get(this.selectedRequestId) ?? null;
+      this.lastSentSelectedRequestId = this.selectedRequestId;
+      this.lastSentSelectedRequest = request;
+      void this.webview?.postMessage({ command: "selectedRequest", request });
+    }
+  }
+
+  private resetWebviewState(): void {
+    this.selectedRequestId = undefined;
+    this.webviewReady = false;
+    this.sentRequests.clear();
+    this.lastSentSelectedRequestId = undefined;
+    this.lastSentSelectedRequest = undefined;
+    this.resetDurationStats();
+  }
+
   update(changedRequestId?: number): void {
-    if (this.panel && this.webviewReady) this.sendSnapshot(false, changedRequestId);
+    if (this.webview && this.webviewReady) this.sendSnapshot(false, changedRequestId);
   }
 
   private sendSnapshot(force: boolean, changedRequestId?: number): void {
-    if (!this.panel || !this.webviewReady) return;
+    if (!this.webview || !this.webviewReady) return;
 
     const requests = this.session.requests;
     const resetRequests = force || (requests.length === 0 && this.sentRequests.size > 0);
@@ -133,7 +170,7 @@ export class WebTestDebugPanelVertical implements vscode.Disposable {
     const end = this.parseTime(this.session.finishedAt) ?? Date.now();
     const elapsedMs = start === undefined ? 0 : Math.max(0, end - start);
 
-    void this.panel.webview.postMessage({
+    void this.webview.postMessage({
       command: "state",
       status: this.session.status,
       testName: this.session.testName ?? "No WebTest selected",
@@ -541,5 +578,7 @@ export class WebTestDebugPanelVertical implements vscode.Disposable {
     this.disposed = true;
     this.panel?.dispose();
     this.panel = undefined;
+    this.view = undefined;
+    this.webview = undefined;
   }
 }
