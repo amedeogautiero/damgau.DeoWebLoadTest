@@ -54,7 +54,7 @@ async function buildWebTestPackage(
       { cwd: projectDirectory, maxBuffer: 10 * 1024 * 1024 },
       (error, stdout, stderr) => {
         if (error) {
-          const details = [stdout, stderr].filter(Boolean).join("\\n");
+          const details = [stdout, stderr].filter(Boolean).join("\n");
           reject(new Error(details || error.message));
           return;
         }
@@ -68,7 +68,7 @@ async function buildWebTestPackage(
   await fs.rm(outputDirectory, { recursive: true, force: true });
   await fs.mkdir(outputDirectory, { recursive: true });
 
-  const excludedRuntimeFiles = /^(xunit(?:\\.|$)|Microsoft\\.TestPlatform(?:\\.|$)|testhost(?:\\.|$)|coverlet(?:\\.|$)|Microsoft\\.CodeCoverage(?:\\.|$))/i;
+  const excludedRuntimeFiles = /^(xunit(?:\.|$)|Microsoft\.TestPlatform(?:\.|$)|testhost(?:\.|$)|coverlet(?:\.|$)|Microsoft\.CodeCoverage(?:\.|$))/i;
   const copyRuntimeOutput = async (source: string, destination: string): Promise<void> => {
     const entries = await fs.readdir(source, { withFileTypes: true });
     for (const entry of entries) {
