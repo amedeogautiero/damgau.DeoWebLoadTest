@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>WebTestSample</RootNamespace>
+    <AssemblyName>WebTestSample</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\\src\\LoadTest.Sdk\\LoadTest.Sdk.csproj" />
+  </ItemGroup>
+</Project>
