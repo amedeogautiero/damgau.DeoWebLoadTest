@@ -2,6 +2,7 @@ using LoadTest.Plugins;
 using LoadTest.Plugins.Compilation;
 using LoadTest.Sdk;
 using System.Reflection.Metadata;
+using System.Reflection.PortableExecutable;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -155,10 +156,54 @@ public class ScriptCompilerTests
                     StringComparison.OrdinalIgnoreCase));
             var document = reader.GetDocument(documentHandle);
 
+            // Verifica algoritmo e checksum del documento sorgente nel Portable PDB.
+            Assert.Equal(
+                new Guid("8829d00f-11b8-4213-878b-770e8597ac16"),
+                reader.GetGuid(document.HashAlgorithm));
+
             var expectedHash = SHA1.HashData(Encoding.UTF8.GetBytes(File.ReadAllText(sourcePath)));
             var actualHash = reader.GetBlobBytes(document.Hash);
-
             Assert.Equal(expectedHash, actualHash);
+
+            // Il PDB deve contenere sia il sorgente originale sia il documento degli using impliciti.
+            var documentNames = reader.Documents
+                .Select(handle => reader.GetString(reader.GetDocument(handle).Name))
+                .ToArray();
+            Assert.Contains(sourcePath, documentNames);
+            Assert.Contains("<usings>", documentNames);
+
+            // Verifica che la DLL punti proprio al Portable PDB appena generato.
+            var assemblyPath = Path.Combine(package.Directory, package.Manifest.Entry);
+            using var assemblyStream = File.OpenRead(assemblyPath);
+            using var peReader = new PEReader(assemblyStream);
+            var debugEntries = peReader.ReadDebugDirectory();
+            var codeViewEntry = Assert.Single(debugEntries.Where(entry =>
+                entry.Type == DebugDirectoryEntryType.CodeView));
+            var codeView = peReader.ReadCodeViewDebugDirectoryData(codeViewEntry);
+            Assert.EndsWith(pdbName, codeView.Path, StringComparison.OrdinalIgnoreCase);
+
+            // L'identificativo CodeView (GUID + stamp) deve corrispondere all'identificativo del PDB.
+            var pdbId = reader.DebugMetadataHeader!.Id;
+            Assert.True(pdbId.Length >= 20);
+            Assert.Equal(new Guid(pdbId.AsSpan(0, 16)), codeView.Guid);
+            Assert.Equal(BitConverter.ToUInt32(pdbId.AsSpan(16, 4)), codeView.Stamp);
+
+            // Se presente, il record PdbChecksum della DLL deve corrispondere ai byte del PDB.
+            var checksumEntry = debugEntries.SingleOrDefault(entry =>
+                entry.Type == DebugDirectoryEntryType.PdbChecksum);
+            if (checksumEntry.DataSize > 0)
+            {
+                var checksum = peReader.ReadPdbChecksumDebugDirectoryData(checksumEntry);
+                var pdbBytes = File.ReadAllBytes(pdbPath);
+                var calculatedPdbHash = checksum.AlgorithmName.ToUpperInvariant() switch
+                {
+                    "SHA256" => SHA256.HashData(pdbBytes),
+                    "SHA1" => SHA1.HashData(pdbBytes),
+                    _ => throw new Xunit.Sdk.XunitException(
+                        $"Algoritmo checksum PDB non supportato nel test: {checksum.AlgorithmName}")
+                };
+                Assert.Equal(calculatedPdbHash, checksum.Checksum);
+            }
         }
         finally
         {
