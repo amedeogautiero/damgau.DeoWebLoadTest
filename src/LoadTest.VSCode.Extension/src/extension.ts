@@ -382,9 +382,23 @@ export function activate(context: vscode.ExtensionContext): void {
         if (buildResult.stdout) runOutput.append(buildResult.stdout);
         if (buildResult.stderr) runOutput.append(buildResult.stderr);
 
-        await fs.mkdir(path.dirname(packagedWebTestFile), { recursive: true });
-        await fs.copyFile(selectedFile, packagedWebTestFile);
-        runOutput.appendLine("WebTest package compiled and prepared.");
+        const sourceEntries = await fs.readdir(webTestsDirectory, { withFileTypes: true });
+        const yamlFiles = sourceEntries.filter(entry =>
+          entry.isFile() && /\.webtest\.ya?ml$/i.test(entry.name)
+        );
+        if (!yamlFiles.some(file => file.name === selectedFileName)) {
+          throw new Error(`The selected WebTest is not directly inside the project's webtests folder: ${selectedFile}`);
+        }
+
+        const destinationWebTests = path.dirname(packagedWebTestFile);
+        await fs.mkdir(destinationWebTests, { recursive: true });
+        for (const file of yamlFiles) {
+          await fs.copyFile(
+            path.join(webTestsDirectory, file.name),
+            path.join(destinationWebTests, file.name)
+          );
+        }
+        runOutput.appendLine(`WebTest package prepared (${yamlFiles.length} YAML files copied).`);
 
         // Avvia il processo Host e inizializza JSON-RPC.
         if (!hostManager.isRunning) await hostManager.start();
