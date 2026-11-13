@@ -128,6 +128,7 @@ export class WebTestDebugSession {
 
   clearRequests(): void {
     this.requestItems.length = 0;
+    this.stepItems.length = 0;
   }
 
   applyExecutionEvent(event: WebTestExecutionEvent): void {
