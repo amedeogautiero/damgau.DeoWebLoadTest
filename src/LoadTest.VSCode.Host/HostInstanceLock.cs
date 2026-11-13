@@ -19,6 +19,17 @@ internal sealed class HostInstanceLock : IDisposable
         _releaseMutex = releaseMutex;
     }
 
+    private static string InstanceSuffix
+    {
+        get
+        {
+            var id = Environment.GetEnvironmentVariable("DEOLOADTEST_HOST_INSTANCE_ID");
+            if (string.IsNullOrWhiteSpace(id)) return "";
+            var safe = new string(id.Where(char.IsLetterOrDigit).Take(64).ToArray());
+            return safe.Length == 0 ? "" : "." + safe;
+        }
+    }
+
     public static HostInstanceLock Acquire()
     {
         if (OperatingSystem.IsWindows())
@@ -93,7 +104,7 @@ internal sealed class HostInstanceLock : IDisposable
 
     private static HostInstanceLock AcquireUnixFileLock()
     {
-        var lockPath = "/tmp/deoloadtest-vscode-host.lock";
+        var lockPath = "/tmp/deoloadtest-vscode-host" + InstanceSuffix + ".lock";
 
         try
         {
