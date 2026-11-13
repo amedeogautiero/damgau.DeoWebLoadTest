@@ -156,7 +156,7 @@
         {
           "id": "deoloadtest",
           "title": "DeoLoadTest",
-          "icon": "./resources/deoloadtest-activity.svg"
+          "icon": "resources/deoloadtest-activity.svg"
         }
       ]
     }
