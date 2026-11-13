@@ -192,8 +192,18 @@ public sealed class WebTestRunner(EngineServices services)
         }
         var path = VariableResolver.Resolve(c.Path, f.Ctx);
         var full = Path.IsPathRooted(path) ? path : Path.GetFullPath(Path.Combine(f.BaseDir, path));
-        await services.CodeSteps.RunAsync(full, f.Ctx, ct);
-        return true;
+        EmitStepEvent("StepStarted", "Code", path, "Started", f, new { path });
+        try
+        {
+            await services.CodeSteps.RunAsync(full, f.Ctx, ct);
+            EmitStepEvent("StepCompleted", "Code", path, "Succeeded", f, new { path });
+            return true;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            EmitStepEvent("StepCompleted", "Code", path, "Failed", f, new { path, error = ex.Message });
+            throw;
+        }
     }
 
     private async Task<bool> ExecuteRequestAsync(RequestStep step, Frame f, CancellationToken ct)
@@ -222,6 +232,9 @@ public sealed class WebTestRunner(EngineServices services)
             Emit(new ExecutionEvent
             {
                 EventType = "RequestStarted",
+                StepType = "Request",
+                StepName = step.Name,
+                StepStatus = "Started",
                 ScenarioName = f.Ctx.User.ScenarioName,
                 TestName = f.Ctx.TestName,
                 UserId = f.Ctx.User.UserId,
@@ -267,6 +280,9 @@ public sealed class WebTestRunner(EngineServices services)
         Emit(new ExecutionEvent
         {
             EventType = success ? "RequestCompleted" : "RequestFailed",
+            StepType = "Request",
+            StepName = step.Name,
+            StepStatus = success ? "Succeeded" : "Failed",
             ScenarioName = f.Ctx.User.ScenarioName,
             TestName = f.Ctx.TestName,
             UserId = f.Ctx.User.UserId,
@@ -323,7 +339,10 @@ public sealed class WebTestRunner(EngineServices services)
         void Run(IValidationRule rule, IReadOnlyDictionary<string, string> args, ValidationLevel level, string label)
         {
             if (level > services.ValidationLevel) return;
+            EmitStepEvent("StepStarted", "Validator", label, "Started", f, new { requestName = step.Name, arguments = args });
             var r = rule.Validate(req, resp, args);
+            EmitStepEvent("StepCompleted", "Validator", label, r.Passed ? "Succeeded" : "Failed", f,
+                new { requestName = step.Name, message = r.Message });
             if (!r.Passed) failures.Add($"{label}: {r.Message}");
         }
 
@@ -339,7 +358,11 @@ public sealed class WebTestRunner(EngineServices services)
     {
         void Run(string name, IExtractionRule rule, IReadOnlyDictionary<string, string> args, bool required)
         {
+            EmitStepEvent("StepStarted", "Extractor", name, "Started", f, new { requestName = step.Name, arguments = args });
             var r = rule.Extract(req, resp, args);
+            EmitStepEvent("StepCompleted", "Extractor", name,
+                r.Success && r.Value is not null ? "Succeeded" : required ? "Failed" : "Succeeded", f,
+                new { requestName = step.Name, success = r.Success, message = r.Message, value = r.Value });
             if (r.Success && r.Value is not null)
             {
                 f.Ctx.Parameters[name] = r.Value;
@@ -364,6 +387,23 @@ public sealed class WebTestRunner(EngineServices services)
             Run(e.Name!, services.Rules.GetExtraction(e.Type, args), args, e.Required);
         }
         foreach (var b in req.ExtractionRules) Run(b.ParameterName, b.Rule, b.Args, b.Required);
+    }
+
+    private void EmitStepEvent(string eventType, string stepType, string stepName, string status, Frame f, object? details = null)
+    {
+        Emit(new ExecutionEvent
+        {
+            EventType = eventType,
+            StepType = stepType,
+            StepName = stepName,
+            StepStatus = status,
+            ScenarioName = f.Ctx.User.ScenarioName,
+            TestName = f.Ctx.TestName,
+            UserId = f.Ctx.User.UserId,
+            Iteration = f.Ctx.Iteration,
+            RequestName = f.Transaction,
+            StepDetails = details
+        });
     }
 
     private void Emit(ExecutionEvent executionEvent)
