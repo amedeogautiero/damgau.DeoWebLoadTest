@@ -158,7 +158,7 @@ public class ScriptCompilerTests
 
             // Verifica algoritmo e checksum del documento sorgente nel Portable PDB.
             Assert.Equal(
-                new Guid("8829d00f-11b8-4213-878b-770e8597ac16"),
+                new Guid("ff1816ec-aa5e-4d10-87f7-6f4963833460"),
                 reader.GetGuid(document.HashAlgorithm));
 
             var expectedHash = SHA1.HashData(Encoding.UTF8.GetBytes(File.ReadAllText(sourcePath)));
