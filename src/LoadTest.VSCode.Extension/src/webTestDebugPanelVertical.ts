@@ -512,7 +512,7 @@ export class WebTestDebugPanelVertical implements vscode.Disposable, vscode.Webv
   function updateSummary(state) {
     const completed = state.successfulRequests + state.failedRequests;
     document.getElementById("test-name").textContent = state.testName;
-    document.getElementById("request-count").textContent = String(state.visibleRequests);
+    document.getElementById("request-count").textContent = String((state.steps || []).length);
     document.getElementById("metric-requests").textContent = String(state.totalRequests);
     document.getElementById("metric-success").textContent = String(state.successfulRequests);
     const failed = document.getElementById("metric-failed");
@@ -569,9 +569,6 @@ export class WebTestDebugPanelVertical implements vscode.Disposable, vscode.Webv
     if (message?.command !== "state") return;
     sessionStartedAt = message.startedAt === "—" ? null : message.startedAt;
     renderSteps(message.steps || []);
-    if (["completed", "failed", "cancelled"].includes(message.status)) {
-      trimEmptySlots(message.visibleRequests || 0);
-    }
     updateSummary(message);
     if (Object.prototype.hasOwnProperty.call(message, "selectedRequest")) {
       renderInspector(message.selectedRequest || null);
