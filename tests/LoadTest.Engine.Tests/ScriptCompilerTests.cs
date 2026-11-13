@@ -3,6 +3,7 @@ using LoadTest.Plugins.Compilation;
 using LoadTest.Sdk;
 using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
+using Microsoft.CodeAnalysis.Text;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -158,10 +159,10 @@ public class ScriptCompilerTests
 
             // Verifica algoritmo e checksum del documento sorgente nel Portable PDB.
             Assert.Equal(
-                new Guid("ff1816ec-aa5e-4d10-87f7-6f4963833460"),
+                new Guid("8829d00f-11b8-4213-878b-770e8597ac16"),
                 reader.GetGuid(document.HashAlgorithm));
 
-            var expectedHash = SHA256.HashData(Encoding.UTF8.GetBytes(File.ReadAllText(sourcePath)));
+            var expectedHash = SourceText.From(File.ReadAllText(sourcePath), Encoding.UTF8).GetChecksum().ToArray();
             var actualHash = reader.GetBlobBytes(document.Hash);
             Assert.Equal(expectedHash, actualHash);
 
