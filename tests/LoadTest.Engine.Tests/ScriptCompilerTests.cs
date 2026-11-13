@@ -161,7 +161,7 @@ public class ScriptCompilerTests
                 new Guid("ff1816ec-aa5e-4d10-87f7-6f4963833460"),
                 reader.GetGuid(document.HashAlgorithm));
 
-            var expectedHash = SHA1.HashData(Encoding.UTF8.GetBytes(File.ReadAllText(sourcePath)));
+            var expectedHash = SHA256.HashData(Encoding.UTF8.GetBytes(File.ReadAllText(sourcePath)));
             var actualHash = reader.GetBlobBytes(document.Hash);
             Assert.Equal(expectedHash, actualHash);
 
