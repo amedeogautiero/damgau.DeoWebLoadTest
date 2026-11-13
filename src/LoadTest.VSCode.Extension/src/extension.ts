@@ -429,7 +429,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
         const projectPath = projectUri.fsPath;
         const projectDirectory = path.dirname(projectPath);
-        const outputDirectory = path.join(projectDirectory, "temp.pkg");
+        const outputDirectory = path.join(projectDirectory, "bin", "temp.pkg");
         const webTestsDirectory = path.join(projectDirectory, "webtests");
         const selectedFileName = path.basename(selectedFile);
         const packagedWebTestFile = path.join(outputDirectory, "webtests", selectedFileName);
