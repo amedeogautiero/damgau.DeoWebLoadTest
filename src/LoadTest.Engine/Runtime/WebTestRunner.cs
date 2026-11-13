@@ -185,21 +185,23 @@ public sealed class WebTestRunner(EngineServices services)
 
     private async Task<bool> ExecuteCodeAsync(CodeStep c, Frame f, CancellationToken ct)
     {
-        if (services.CodeSteps is null)
-        {
-            f.Failures.Add($"code: nessun host per i passi in codice configurato ('{c.Path}')");
-            return false;
-        }
         var path = VariableResolver.Resolve(c.Path, f.Ctx);
         var full = Path.IsPathRooted(path) ? path : Path.GetFullPath(Path.Combine(f.BaseDir, path));
         EmitStepEvent("StepStarted", "Code", path, "Started", f, new { path });
+        if (services.CodeSteps is null)
+        {
+            const string message = "Nessun host per i passi in codice configurato.";
+            EmitStepEvent("StepCompleted", "Code", path, "Failed", f, new { path, error = message });
+            f.Failures.Add($"code: {message} ('{c.Path}')");
+            return false;
+        }
         try
         {
             await services.CodeSteps.RunAsync(full, f.Ctx, ct);
             EmitStepEvent("StepCompleted", "Code", path, "Succeeded", f, new { path });
             return true;
         }
-        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        catch (Exception ex)
         {
             EmitStepEvent("StepCompleted", "Code", path, "Failed", f, new { path, error = ex.Message });
             throw;
@@ -340,10 +342,18 @@ public sealed class WebTestRunner(EngineServices services)
         {
             if (level > services.ValidationLevel) return;
             EmitStepEvent("StepStarted", "Validator", label, "Started", f, new { requestName = step.Name, arguments = args });
-            var r = rule.Validate(req, resp, args);
-            EmitStepEvent("StepCompleted", "Validator", label, r.Passed ? "Succeeded" : "Failed", f,
-                new { requestName = step.Name, message = r.Message });
-            if (!r.Passed) failures.Add($"{label}: {r.Message}");
+            try
+            {
+                var r = rule.Validate(req, resp, args);
+                EmitStepEvent("StepCompleted", "Validator", label, r.Passed ? "Succeeded" : "Failed", f,
+                    new { requestName = step.Name, message = r.Message });
+                if (!r.Passed) failures.Add($"{label}: {r.Message}");
+            }
+            catch (Exception ex)
+            {
+                EmitStepEvent("StepCompleted", "Validator", label, "Failed", f, new { requestName = step.Name, error = ex.Message });
+                throw;
+            }
         }
 
         foreach (var v in step.Validate)
@@ -359,7 +369,16 @@ public sealed class WebTestRunner(EngineServices services)
         void Run(string name, IExtractionRule rule, IReadOnlyDictionary<string, string> args, bool required)
         {
             EmitStepEvent("StepStarted", "Extractor", name, "Started", f, new { requestName = step.Name, arguments = args });
-            var r = rule.Extract(req, resp, args);
+            ExtractionResult r;
+            try
+            {
+                r = rule.Extract(req, resp, args);
+            }
+            catch (Exception ex)
+            {
+                EmitStepEvent("StepCompleted", "Extractor", name, "Failed", f, new { requestName = step.Name, error = ex.Message });
+                throw;
+            }
             EmitStepEvent("StepCompleted", "Extractor", name,
                 r.Success && r.Value is not null ? "Succeeded" : required ? "Failed" : "Succeeded", f,
                 new { requestName = step.Name, success = r.Success, message = r.Message, value = r.Value });
