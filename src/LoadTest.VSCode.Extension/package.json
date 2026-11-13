@@ -26,7 +26,8 @@
     "onCommand:deoloadtest.stopWebTest",
     "onCommand:deoloadtest.showDebugPanel",
     "onCommand:deoloadtest.showVerticalDebugPanel",
-    "onCommand:deoloadtest.compileWebTest"
+    "onCommand:deoloadtest.compileWebTest",
+    "onCommand:deoloadtest.showDeoLoadTestView"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -98,6 +99,11 @@
         "command": "deoloadtest.showVerticalDebugPanel",
         "title": "DeoLoadTest: Show Panel",
         "icon": "$(layout-sidebar-right)"
+      },
+      {
+        "command": "deoloadtest.showDeoLoadTestView",
+        "title": "DeoLoadTest: Open Sidebar",
+        "icon": "$(layout-sidebar-left)"
       }
     ],
     "views": {
@@ -119,10 +125,6 @@
       {
         "view": "deoloadtest.requestExplorer",
         "contents": "Run a WebTest to inspect its HTTP requests.\n[Run WebTest](command:deoloadtest.runWebTest)"
-      },
-      {
-        "view": "deoloadtest.mainView",
-        "contents": "Welcome to DeoLoadTest.\n[Open DeoLoadTest Panel](command:deoloadtest.showVerticalDebugPanel)"
       }
     ],
     "menus": {
