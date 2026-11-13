@@ -71,7 +71,7 @@ async function buildWebTestPackage(
   // della build normale e rimuove esclusivamente gli artefatti del test runner.
   await fs.mkdir(outputDirectory, { recursive: true });
 
-  const excludedRuntimeFiles = /^(xunit(?:\.|$)|Microsoft\.TestPlatform(?:\.|$)|Microsoft\.VisualStudio\.TestPlatform(?:\.|$)|testhost(?:\.|$)|coverlet(?:\.|$)|Microsoft\.CodeCoverage(?:\.|$)|\.msCoverageSourceRootsMapping(?:_|$))/i;
+  const excludedRuntimeFiles = /^(xunit(?:\.|$)|Microsoft\.TestPlatform(?:\.|$)|Microsoft\.VisualStudio\.TestPlatform(?:\.|$)|Microsoft\.VisualStudio\.CodeCoverage\.Shim(?:\.|$)|testhost(?:\.|$)|coverlet(?:\.|$)|Microsoft\.CodeCoverage(?:\.|$)|\.msCoverageSourceRootsMapping(?:_|$)|.+\.(?:deps|runtimeconfig)\.json$)/i;
   const copyRuntimeOutput = async (source: string, destination: string): Promise<void> => {
     const entries = await fs.readdir(source, { withFileTypes: true });
     for (const entry of entries) {
