@@ -1,10 +1,25 @@
 export type DebugSessionStatus = "idle" | "running" | "completed" | "failed" | "cancelled";
 export type DebugRequestStatus = "pending" | "succeeded" | "failed";
+export type DebugStepType = "Request" | "Code" | "Extractor" | "Validator";
+export interface DebugStep {
+  readonly id: number;
+  readonly type: DebugStepType;
+  readonly name: string;
+  readonly status: "pending" | "succeeded" | "failed";
+  readonly startedAt?: string;
+  readonly completedAt?: string;
+  readonly details?: unknown;
+  readonly requestId?: number;
+}
 
 export interface WebTestExecutionEvent {
   eventType?: string;
   timestampUtc?: string;
   requestName?: string;
+  stepType?: DebugStepType;
+  stepName?: string;
+  stepStatus?: "Started" | "Succeeded" | "Failed";
+  stepDetails?: unknown;
   method?: string;
   url?: string;
   requestHeaders?: Record<string, string>;
@@ -65,6 +80,8 @@ export interface DebugSessionSummary {
 export class WebTestDebugSession {
   private nextRequestId = 1;
   private readonly requestItems: DebugRequest[] = [];
+  private readonly stepItems: DebugStep[] = [];
+  private nextStepId = 1;
   private currentStatus: DebugSessionStatus = "idle";
   private currentContext: WebTestContextSnapshot | undefined;
   private currentSummary: DebugSessionSummary | undefined;
@@ -87,12 +104,15 @@ export class WebTestDebugSession {
   get failedRequests(): number { return this.failedRequestCount; }
   get requestDurationsMs(): readonly number[] { return this.requestDurationValues; }
   get requests(): readonly DebugRequest[] { return this.requestItems; }
+  get steps(): readonly DebugStep[] { return this.stepItems; }
   get context(): WebTestContextSnapshot | undefined { return this.currentContext; }
   get summary(): DebugSessionSummary | undefined { return this.currentSummary; }
 
   start(runId: string, startedAt = new Date().toISOString(), testName?: string): void {
     this.nextRequestId = 1;
+    this.nextStepId = 1;
     this.requestItems.length = 0;
+    this.stepItems.length = 0;
     this.currentStatus = "running";
     this.currentRunId = runId;
     this.currentTestName = testName;
@@ -111,6 +131,7 @@ export class WebTestDebugSession {
   }
 
   applyExecutionEvent(event: WebTestExecutionEvent): void {
+    if (event.stepType && event.stepName) this.applyStepEvent(event);
     switch (event.eventType) {
       case "RequestStarted":
         this.startRequest(event);
@@ -173,6 +194,42 @@ export class WebTestDebugSession {
       contextAtStart: event.contextSnapshot,
       status: "pending"
     });
+    const request = this.requestItems[this.requestItems.length - 1];
+    this.addStep("Request", event.requestName ?? "HTTP request", "pending", event.timestampUtc, undefined, event, request.id);
+  }
+
+  private applyStepEvent(event: WebTestExecutionEvent): void {
+    const type = event.stepType!;
+    const name = event.stepName ?? event.requestName ?? type;
+    if (type === "Request") {
+      const index = this.findPendingStep("Request", name);
+      if (index >= 0) this.updateStep(index, event);
+      return;
+    }
+    if (event.stepStatus === "Started") {
+      this.addStep(type, name, "pending", event.timestampUtc, undefined, event);
+      return;
+    }
+    const index = this.findPendingStep(type, name);
+    if (index >= 0) this.updateStep(index, event);
+    else this.addStep(type, name, event.stepStatus === "Failed" ? "failed" : "succeeded", event.timestampUtc, event.timestampUtc, event);
+  }
+
+  private addStep(type: DebugStepType, name: string, status: DebugStep["status"], startedAt?: string, completedAt?: string, event?: WebTestExecutionEvent, requestId?: number): void {
+    this.stepItems.push({ id: this.nextStepId++, type, name, status, startedAt, completedAt, details: event?.stepDetails, requestId });
+  }
+
+  private findPendingStep(type: DebugStepType, name: string): number {
+    for (let i = this.stepItems.length - 1; i >= 0; i--) {
+      if (this.stepItems[i].type === type && this.stepItems[i].name === name && this.stepItems[i].status === "pending") return i;
+    }
+    return -1;
+  }
+
+  private updateStep(index: number, event: WebTestExecutionEvent): void {
+    const previous = this.stepItems[index];
+    const status = event.stepStatus === "Failed" ? "failed" : event.stepStatus === "Succeeded" ? "succeeded" : previous.status;
+    this.stepItems[index] = { ...previous, status, completedAt: event.stepStatus === "Started" ? previous.completedAt : event.timestampUtc, details: event.stepDetails ?? previous.details };
   }
 
   private completeRequest(event: WebTestExecutionEvent, status: "succeeded" | "failed"): void {
