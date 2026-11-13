@@ -9,23 +9,20 @@ public sealed class HostProcessIntegrationTests
     [Fact]
     public async Task Host_process_runs_calculate_value_webtest_in_debug_mode()
     {
-        var fixturePath = Path.GetFullPath(Path.Combine(
-            AppContext.BaseDirectory, "Fixtures", "CalculateValue.csx"));
-        Assert.True(File.Exists(fixturePath), $"Fixture non trovata: {fixturePath}");
-        Assert.False(string.IsNullOrWhiteSpace(await File.ReadAllTextAsync(fixturePath)),
-            "La fixture CalculateValue.csx deve contenere il codice reale.");
+        var sourcePath = @"C:\temp\webtests\CalculateValue.csx";
+        Assert.True(File.Exists(sourcePath), $"File sorgente non trovato: {sourcePath}");
+        Assert.False(string.IsNullOrWhiteSpace(await File.ReadAllTextAsync(sourcePath)),
+            "Il file CalculateValue.csx deve contenere il codice.");
 
         var hostAssemblyPath = FindHostAssembly();
         var tempDirectory = Directory.CreateTempSubdirectory("deoloadtest-host-integration-");
         var webTestPath = Path.Combine(tempDirectory.FullName, "HostIntegration.webtest.yaml");
-        var sourcePath = Path.Combine(tempDirectory.FullName, "CalculateValue.csx");
-        File.Copy(fixturePath, sourcePath);
 
-        await File.WriteAllTextAsync(webTestPath, """
+        await File.WriteAllTextAsync(webTestPath, $$"""
             version: 1
             name: Host process integration
             steps:
-              - code: CalculateValue.csx
+              - code: "{{sourcePath.Replace("\\", "/")}}"
             """);
 
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(45));
