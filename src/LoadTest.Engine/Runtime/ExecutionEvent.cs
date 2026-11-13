@@ -10,6 +10,14 @@ public sealed record ExecutionEvent
     public int? UserId { get; init; }
     public int? Iteration { get; init; }
     public string? RequestName { get; init; }
+    /// <summary>Categoria dello step visualizzato nel debugger: Request, Code, Extractor o Validator.</summary>
+    public string? StepType { get; init; }
+    /// <summary>Nome leggibile dello step, della regola o del codice eseguito.</summary>
+    public string? StepName { get; init; }
+    /// <summary>Stato dello step: Started, Succeeded o Failed.</summary>
+    public string? StepStatus { get; init; }
+    /// <summary>Dettagli strutturati specifici dello step.</summary>
+    public object? StepDetails { get; init; }
     public string? Method { get; init; }
     public string? Url { get; init; }
     public IReadOnlyDictionary<string, string>? RequestHeaders { get; init; }
