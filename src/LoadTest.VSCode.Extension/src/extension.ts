@@ -75,7 +75,7 @@ async function buildWebTestPackage(
     '  </ItemGroup>',
     '</Project>',
     ''
-  ].join("\\n");
+  ].join("\n");
 
   await fs.writeFile(generatedProjectPath, generatedProject, "utf8");
 
@@ -86,7 +86,7 @@ async function buildWebTestPackage(
       { cwd: projectDirectory, maxBuffer: 10 * 1024 * 1024 },
       (error, stdout, stderr) => {
         if (error) {
-          const details = [stdout, stderr].filter(Boolean).join("\\n");
+          const details = [stdout, stderr].filter(Boolean).join("\n");
           reject(new Error(details || error.message));
           return;
         }
