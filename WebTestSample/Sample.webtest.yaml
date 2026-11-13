@@ -1,8 +1,0 @@
-version: 1
-name: WebTestSample
-baseUrl: https://example.com
-steps:
-  - name: Example request
-    request:
-      method: GET
-      url: /
