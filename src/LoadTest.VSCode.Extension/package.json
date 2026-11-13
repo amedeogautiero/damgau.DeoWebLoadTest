@@ -118,7 +118,8 @@
       "deoloadtest": [
         {
           "id": "deoloadtest.mainView",
-          "name": "DeoLoadTest"
+          "name": "DeoLoadTest",
+          "type": "webview"
         }
       ]
     },
