@@ -119,7 +119,7 @@ public sealed class HostProcessIntegrationTests
                         .Select(failure => failure.GetString())));
             }
 
-            Assert.True(HostPdbContainsSource(hostAssemblyPath, sourcePath),
+            Assert.True(HostPdbContainsSource(sourcePath),
                 $"L'Host non ha prodotto nel PluginCache un PDB riferito al sorgente {sourcePath}.");
         }
         finally
@@ -196,7 +196,7 @@ public sealed class HostProcessIntegrationTests
         message.TryGetProperty("method", out var value) &&
         string.Equals(value.GetString(), method, StringComparison.Ordinal);
 
-    private static bool HostPdbContainsSource(string hostAssemblyPath, string sourcePath)
+    private static bool HostPdbContainsSource(string sourcePath)
     {
         var cacheRoot = Path.Combine(
             Path.GetTempPath(), "DeoLoadTest", "VSCode", "PluginCache");
