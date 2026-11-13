@@ -512,7 +512,7 @@ export function activate(context: vscode.ExtensionContext): void {
         void vscode.commands.executeCommand("setContext", "deoloadtest.webTestRunning", true);
         requestExplorer.refresh();
         timingInspector.update(webTestDebugSession.requests, webTestDebugSession.status);
-        verticalDebugPanel.show();
+        void vscode.commands.executeCommand("workbench.view.extension.deoloadtest");
         runOutput.appendLine(`WebTest accepted. Run ID: ${result.runId}`);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
@@ -578,6 +578,17 @@ export function activate(context: vscode.ExtensionContext): void {
   const showVerticalDebugPanelCommand = vscode.commands.registerCommand(
     "deoloadtest.showVerticalDebugPanel",
     () => verticalDebugPanel.show()
+  );
+
+  const showDeoLoadTestViewCommand = vscode.commands.registerCommand(
+    "deoloadtest.showDeoLoadTestView",
+    () => vscode.commands.executeCommand("workbench.view.extension.deoloadtest")
+  );
+
+  const deoLoadTestViewProvider = vscode.window.registerWebviewViewProvider(
+    "deoloadtest.mainView",
+    verticalDebugPanel,
+    { webviewOptions: { retainContextWhenHidden: true } }
   );
 
   const showTimingInspectorCommand = vscode.commands.registerCommand(
@@ -758,6 +769,8 @@ export function activate(context: vscode.ExtensionContext): void {
     verticalDebugPanel,
     showDebugPanelCommand,
     showVerticalDebugPanelCommand,
+    showDeoLoadTestViewCommand,
+    deoLoadTestViewProvider,
     showTimingInspectorCommand,
     clearRequestExplorerCommand,
     focusRequestExplorerCommand,
