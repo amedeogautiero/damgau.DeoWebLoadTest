@@ -189,7 +189,7 @@ export class WebTestDebugPanelVertical implements vscode.Disposable {
 <header>
   <div><h1>DeoLoadTest Debug Panel - Vertical</h1><div class="test-name" id="test-name">No WebTest selected</div></div>
   <div class="toolbar">
-    <button id="host-start">▶ Start Host</button><button id="host-stop" class="danger">■ Stop Host</button>
+    <button id="host-start" hidden>▶ Start Host</button><button id="host-stop" class="danger" hidden>■ Stop Host</button>
     <button id="run">▶ Run</button><button id="stop" class="danger" disabled>■ Stop</button>
     <button id="clear" disabled>Clear</button><span id="status" class="status muted"><i></i>Idle</span>
   </div>
