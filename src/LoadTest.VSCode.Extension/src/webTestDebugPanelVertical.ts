@@ -17,6 +17,7 @@ export class WebTestDebugPanelVertical implements vscode.Disposable {
   constructor(
     private readonly session: WebTestDebugSession,
     private readonly onRun: () => void,
+    private readonly onDebug: () => void,
     private readonly onStop: () => void,
     private readonly onClear: () => void,
     private readonly onHostStart: () => void,
@@ -39,6 +40,8 @@ export class WebTestDebugPanelVertical implements vscode.Disposable {
           this.sendSnapshot(true);
         } else if (message?.command === "run") {
           this.onRun();
+        } else if (message?.command === "debug") {
+          this.onDebug();
         } else if (message?.command === "stop") {
           this.onStop();
         } else if (message?.command === "clear") {
@@ -190,7 +193,7 @@ export class WebTestDebugPanelVertical implements vscode.Disposable {
   <div><h1>DeoLoadTest Debug Panel - Vertical</h1><div class="test-name" id="test-name">No WebTest selected</div></div>
   <div class="toolbar">
     <button id="host-start" hidden>▶ Start Host</button><button id="host-stop" class="danger" hidden>■ Stop Host</button>
-    <button id="run">▶ Run</button><button id="stop" class="danger" disabled>■ Stop</button>
+    <button id="run">▶ Run</button><button id="debug">🐞 Debug</button><button id="stop" class="danger" disabled>■ Stop</button>
     <button id="clear" disabled>Clear</button><span id="status" class="status muted"><i></i>Idle</span>
   </div>
 </header>
