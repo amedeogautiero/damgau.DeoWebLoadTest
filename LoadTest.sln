@@ -30,6 +30,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "LoadTest.Execution", "src\L
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "LoadTest.VSCode.Host", "src\LoadTest.VSCode.Host\LoadTest.VSCode.Host.csproj", "{7C8A9E21-6D34-4B52-AF81-9D2B6E4C1037}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LoadTest.WebTestSample", "src\LoadTest.WebTestSample\LoadTest.WebTestSample.csproj", "{E607DFFC-682F-FF71-0A8D-41F8BFD0032C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -92,6 +94,10 @@ Global
 		{7C8A9E21-6D34-4B52-AF81-9D2B6E4C1037}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{7C8A9E21-6D34-4B52-AF81-9D2B6E4C1037}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{7C8A9E21-6D34-4B52-AF81-9D2B6E4C1037}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E607DFFC-682F-FF71-0A8D-41F8BFD0032C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E607DFFC-682F-FF71-0A8D-41F8BFD0032C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E607DFFC-682F-FF71-0A8D-41F8BFD0032C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E607DFFC-682F-FF71-0A8D-41F8BFD0032C}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
