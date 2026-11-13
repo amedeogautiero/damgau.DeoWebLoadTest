@@ -1,6 +1,9 @@
 using LoadTest.Plugins;
 using LoadTest.Plugins.Compilation;
 using LoadTest.Sdk;
+using System.Reflection.Metadata;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace LoadTest.Engine.Tests;
 
@@ -112,6 +115,55 @@ public class ScriptCompilerTests
     public void Rejects_top_level_statements()
     {
         Assert.Throws<ScriptCompilationException>(() => ScriptPackageCompiler.Compile(NewPackage("var x = 1;\n" + EchoRule), NewCache()));
+    }
+
+    [Fact]
+    public void CompileSingleFile_pdb_checksum_matches_original_source()
+    {
+        var temp = Directory.CreateTempSubdirectory("single-file-pdb");
+        try
+        {
+            var sourcePath = Path.GetFullPath(Path.Combine(temp.FullName, "ChecksumTest.csx"));
+            const string code = """
+                public sealed class ChecksumTest : ICodedTest
+                {
+                    public Task RunAsync(TestContext ctx)
+                    {
+                        var value = 42;
+                        ctx.Set("value", value.ToString());
+                        return Task.CompletedTask;
+                    }
+                }
+                """;
+            File.WriteAllText(sourcePath, code, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+
+            var cache = new PluginCache(Path.Combine(temp.FullName, "cache"));
+            var package = ScriptPackageCompiler.CompileSingleFile(
+                sourcePath, cache, emitSymbols: true);
+
+            var pdbName = Path.GetFileNameWithoutExtension(package.Manifest.Entry) + ".pdb";
+            var pdbPath = Path.Combine(package.Directory, pdbName);
+            Assert.True(File.Exists(pdbPath));
+
+            using var pdbStream = File.OpenRead(pdbPath);
+            using var provider = MetadataReaderProvider.FromPortablePdbStream(pdbStream);
+            var reader = provider.GetMetadataReader();
+            var documentHandle = reader.Documents.Single(handle =>
+                string.Equals(
+                    reader.GetString(reader.GetDocument(handle).Name),
+                    sourcePath,
+                    StringComparison.OrdinalIgnoreCase));
+            var document = reader.GetDocument(documentHandle);
+
+            var expectedHash = SHA1.HashData(Encoding.UTF8.GetBytes(File.ReadAllText(sourcePath)));
+            var actualHash = reader.GetBlobBytes(document.Hash);
+
+            Assert.Equal(expectedHash, actualHash);
+        }
+        finally
+        {
+            temp.Delete(recursive: true);
+        }
     }
 
     [Fact]
