@@ -27,8 +27,8 @@ internal static class Program
             await File.WriteAllTextAsync(webTestPath, yaml);
 
             // Inietta nel server gli stessi messaggi JSON-RPC che invierebbe l'estensione.
-            // Dopo i due messaggi, la lettura prosegue da Console.In: l'Host resta vivo
-            // anche quando il WebTest è terminato, così possiamo ispezionare il processo.
+            // Dopo i due messaggi, il reader resta in attesa: l'Host non termina al termine
+            // del WebTest e possiamo ispezionare il processo con il debugger.
             var messages = new[]
             {
                 JsonSerializer.Serialize(new
@@ -53,9 +53,9 @@ internal static class Program
 
             Console.Error.WriteLine($"Host diagnostic WebTest: {webTestPath}");
             Console.Error.WriteLine($"Host diagnostic script:  {sourcePath}");
-            Console.Error.WriteLine("Il processo resterà in attesa dopo la run. Arrestare con Stop Debugging.");
+            Console.Error.WriteLine("Il processo resterà vivo dopo la run. Arrestare con Stop Debugging.");
 
-            var input = new PrefixTextReader(messages, Console.In);
+            var input = new PrefixTextReader(messages);
             var server = new StdioJsonRpcServer(input, Console.Out, Console.Error);
             await server.RunAsync();
             return 0;
@@ -73,16 +73,18 @@ internal static class Program
         }
     }
 
-    private sealed class PrefixTextReader(IEnumerable<string> prefix, TextReader tail) : TextReader
+    private sealed class PrefixTextReader(IEnumerable<string> prefix) : TextReader
     {
         private readonly Queue<string> _lines = new(prefix);
 
-        public override ValueTask<string?> ReadLineAsync(CancellationToken cancellationToken)
+        public override async ValueTask<string?> ReadLineAsync(CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            return _lines.TryDequeue(out var line)
-                ? ValueTask.FromResult<string?>(line)
-                : tail.ReadLineAsync(cancellationToken);
+            if (_lines.TryDequeue(out var line))
+                return line;
+
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            return null;
         }
     }
 }
