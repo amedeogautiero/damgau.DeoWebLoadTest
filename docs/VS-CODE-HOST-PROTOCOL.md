@@ -68,14 +68,17 @@ Only one local execution can be active in this first version. A second start req
 
 Runs one `.webtest.yaml` directly through the shared `WebTestRunner`, without creating a temporary `.loadtest.yaml` file. This is a single-user, single-iteration execution intended for functional verification of a WebTest, not load generation.
 
+The VS Code extension builds the WebTest project first, prepares its output under `bin/WebTest`, then sends the package directory and the selected YAML path relative to that directory. The Host loads the definition from the package and starts the run in the same request.
+
 Parameters:
-- `webTestFile` (required): path to the `.webtest.yaml` file.
+- `webTestDirectory` (required): absolute path to the compiled WebTest package directory.
+- `webTestFile` (required): path to the `.webtest.yaml` file relative to `webTestDirectory`.
 - `debugMode` (optional, default `false`): forwards structured request and test events as `webtest.event` notifications.
 
 Request:
 
 ```json
-{"jsonrpc":"2.0","id":4,"method":"webtest.run","params":{"webTestFile":"C:/tests/sample.webtest.yaml","debugMode":true}}
+{"jsonrpc":"2.0","id":4,"method":"webtest.run","params":{"webTestDirectory":"C:/tests/MyWebTest/bin/WebTest","webTestFile":"webtests/sample.webtest.yaml","debugMode":true}}
 ```
 
 Response:
