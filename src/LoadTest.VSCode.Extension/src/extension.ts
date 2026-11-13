@@ -71,7 +71,7 @@ async function buildWebTestPackage(
   // della build normale e rimuove esclusivamente gli artefatti del test runner.
   await fs.mkdir(outputDirectory, { recursive: true });
 
-  const excludedRuntimeFiles = /^(xunit(?:\.|$)|Microsoft\.TestPlatform(?:\.|$)|testhost(?:\.|$)|coverlet(?:\.|$)|Microsoft\.CodeCoverage(?:\.|$))/i;
+  const excludedRuntimeFiles = /^(xunit(?:\.|$)|Microsoft\.TestPlatform(?:\.|$)|Microsoft\.VisualStudio\.TestPlatform(?:\.|$)|testhost(?:\.|$)|coverlet(?:\.|$)|Microsoft\.CodeCoverage(?:\.|$)|\.msCoverageSourceRootsMapping(?:_|$))/i;
   const copyRuntimeOutput = async (source: string, destination: string): Promise<void> => {
     const entries = await fs.readdir(source, { withFileTypes: true });
     for (const entry of entries) {
@@ -95,18 +95,19 @@ async function buildWebTestPackage(
     );
   }
 
-  // Copia i contenuti del WebTest che non fanno parte della compilazione.
-  for (const directoryName of ["Scripts", "datasources", "resources"]) {
-    const sourceDirectory = path.join(projectDirectory, directoryName);
-    try {
-      await fs.cp(sourceDirectory, path.join(outputDirectory, directoryName), {
-        recursive: true,
-        force: true
-      });
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+  // Elimina ricorsivamente le directory rimaste vuote dopo i filtri.
+  const removeEmptyDirectories = async (directory: string): Promise<boolean> => {
+    const entries = await fs.readdir(directory, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      const childDirectory = path.join(directory, entry.name);
+      if (await removeEmptyDirectories(childDirectory)) {
+        await fs.rmdir(childDirectory);
+      }
     }
-  }
+    return (await fs.readdir(directory)).length === 0;
+  };
+  await removeEmptyDirectories(outputDirectory);
 
   return buildResult;
 }
@@ -600,7 +601,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
       const projectPath = projectUri.fsPath;
       const projectDirectory = path.dirname(projectPath);
-      const outputDirectory = path.join(projectDirectory, "temp.pkg");
+      const outputDirectory = path.join(projectDirectory, "bin", "temp.pkg");
       const webTestsDirectory = path.join(projectDirectory, "webtests");
 
       runOutput.show(true);
