@@ -47,7 +47,7 @@ internal sealed class HostInstanceLock : IDisposable
 
         var thread = new Thread(() =>
         {
-            using var mutex = new Mutex(false, @"Global\DeoLoadTest.LoadTest.VSCode.Host");
+            using var mutex = new Mutex(false, @"Global\DeoLoadTest.LoadTest.VSCode.Host" + InstanceSuffix);
 
             try
             {
