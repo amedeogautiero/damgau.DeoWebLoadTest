@@ -486,6 +486,7 @@ export class WebTestDebugPanelVertical implements vscode.Disposable {
     if (target.id === "host-start") vscode.postMessage({ command: "hostStart" });
     else if (target.id === "host-stop") vscode.postMessage({ command: "hostStop" });
     else if (target.id === "run") vscode.postMessage({ command: "run" });
+    else if (target.id === "debug") vscode.postMessage({ command: "debug" });
     else if (target.id === "stop") vscode.postMessage({ command: "stop" });
     else if (target.id === "clear") vscode.postMessage({ command: "clear" });
     else if (target.dataset.select) vscode.postMessage({ command: "select", requestId: Number(target.dataset.select) });
