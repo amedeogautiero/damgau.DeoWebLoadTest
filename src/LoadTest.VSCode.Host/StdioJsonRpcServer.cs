@@ -38,6 +38,7 @@ internal sealed class StdioJsonRpcServer(TextReader input, TextWriter output, Te
     {
         public RunWebTestParams() { }
 
+        public string WebTestDirectory { get; set; } = "";
         public string WebTestFile { get; set; } = "";
         public bool DebugMode { get; set; }
     }
@@ -176,6 +177,8 @@ internal sealed class StdioJsonRpcServer(TextReader input, TextWriter output, Te
                         : JsonSerializer.Deserialize<RunWebTestParams>(parameters.GetRawText(), JsonOptions)
                             ?? throw new RpcException(-32602, "Invalid params");
 
+                    if (string.IsNullOrWhiteSpace(request.WebTestDirectory))
+                        throw new RpcException(-32602, "webTestDirectory is required");
                     if (string.IsNullOrWhiteSpace(request.WebTestFile))
                         throw new RpcException(-32602, "webTestFile is required");
 
@@ -262,9 +265,22 @@ internal sealed class StdioJsonRpcServer(TextReader input, TextWriter output, Te
     {
         try
         {
-            var path = Path.GetFullPath(request.WebTestFile);
+            var packageDirectory = Path.GetFullPath(request.WebTestDirectory);
+            if (!Directory.Exists(packageDirectory))
+                throw new DirectoryNotFoundException($"WebTest package directory not found: {packageDirectory}");
+
+            if (Path.IsPathRooted(request.WebTestFile))
+                throw new InvalidOperationException("webTestFile must be relative to webTestDirectory.");
+
+            var path = Path.GetFullPath(Path.Combine(packageDirectory, request.WebTestFile));
+            var packagePrefix = packageDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                + Path.DirectorySeparatorChar;
+            if (!path.StartsWith(packagePrefix, OperatingSystem.IsWindows()
+                ? StringComparison.OrdinalIgnoreCase
+                : StringComparison.Ordinal))
+                throw new InvalidOperationException("webTestFile must remain inside the WebTest package directory.");
             if (!File.Exists(path))
-                throw new FileNotFoundException($"WebTest file not found: {path}", path);
+                throw new FileNotFoundException($"WebTest file not found in package: {path}", path);
 
             var definition = WebTestLoader.LoadFile(path);
             using var http = new HttpClientExecutor();
@@ -273,7 +289,7 @@ internal sealed class StdioJsonRpcServer(TextReader input, TextWriter output, Te
             // La cache è condivisa tra le run locali; l'hash del pacchetto distingue le versioni.
             var cacheRoot = Path.Combine(Path.GetTempPath(), "DeoLoadTest", "VSCode", "PluginCache");
             var pluginCache = new PluginCache(cacheRoot);
-            var pluginRoot = Path.Combine(Path.GetDirectoryName(path)!, "plugins");
+            var pluginRoot = Path.Combine(packageDirectory, "plugins");
             var catalog = PluginCatalog.FromDirectory(pluginRoot, pkg =>
                 ScriptPackageCompiler.Compile(pkg, pluginCache, emitSymbols: request.DebugMode));
             using var pluginHost = new PluginHost(catalog);
