@@ -17,6 +17,9 @@
     <ProjectReference Include="..\..\src\LoadTest.Reports\LoadTest.Reports.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="Fixtures\CalculateValue.csx" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
     <Using Include="Xunit" />
   </ItemGroup>
 </Project>
