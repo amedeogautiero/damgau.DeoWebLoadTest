@@ -24,7 +24,8 @@
     "onCommand:deoloadtest.clearRequestExplorer",
     "onCommand:deoloadtest.stopWebTest",
     "onCommand:deoloadtest.showDebugPanel",
-    "onCommand:deoloadtest.showVerticalDebugPanel"
+    "onCommand:deoloadtest.showVerticalDebugPanel",
+    "onCommand:deoloadtest.compileWebTest"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -49,6 +50,11 @@
         "command": "deoloadtest.runWebTest",
         "title": "DeoLoadTest: Run WebTest",
         "icon": "$(play)"
+      },
+      {
+        "command": "deoloadtest.compileWebTest",
+        "title": "DeoLoadTest: Compile WebTest",
+        "icon": "$(file-code)"
       },
       {
         "command": "deoloadtest.compileScript",
