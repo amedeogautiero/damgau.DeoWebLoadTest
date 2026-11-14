@@ -11,13 +11,21 @@ steps:
     request:
       method: GET
       url: https://example.com/
-    expectedStatus: 200
+    expectedStatus: 200    
+    extract:
+      - name: AgeValue
+        type: header
+        header: Age
+
   - code: CalcolaValore
   - name: es2
     request:
       method: GET
       url: https://example.com/
+      headers:
+        Age: ${{AgeValue}}
     expectedStatus: 200    
+
   - name: es3
     request:
       method: GET
