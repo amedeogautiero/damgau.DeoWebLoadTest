@@ -54,6 +54,10 @@ public sealed class EngineServices
     public IMeasurementSink Sink { get; init; } = NullMeasurementSink.Instance;
     /// <summary>Riceve eventi di dettaglio WebTest. Gli errori del consumer non interrompono l'esecuzione.</summary>
     public Action<ExecutionEvent>? OnExecutionEvent { get; init; }
+    /// <summary>True only for an interactive WebTest debug run.</summary>
+    public bool DebugMode { get; init; }
+    /// <summary>Suspends at a YAML request breakpoint until the debugger resumes or cancellation is requested.</summary>
+    public Func<ExecutionEvent, CancellationToken, Task>? WaitForContinue { get; init; }
     /// <summary>Gestisce gli errori dei callback di osservazione senza interrompere l'esecuzione.</summary>
     public Action<Exception>? OnPluginError { get; init; }
     public IThinkTimeProvider ThinkTime { get; init; } = new RecordedThinkTimeProvider();
