@@ -91,11 +91,30 @@ The execution uses the WebTest's own defaults, context, steps and relative file 
 
 Notifications:
 - `webtest.event`: structured engine event, emitted only when `debugMode` is true.
+- A request step may declare `breakpoint: true` at the same level as `expectedStatus`. In Debug mode, the Engine binds variables and runs pre-request plugins, emits `BreakpointReached` with the resolved request details, and waits. The extension resumes it with `webtest.continue`. Normal Run mode ignores the property. Stop/cancellation is honored while paused.
 - `webtest.completed`: includes `success`, `failures`, `elapsedMs` and the number of started HTTP requests. A completed WebTest may have `success: false` when a request or validation fails.
 - `webtest.failed`: emitted when the Host cannot load or start the WebTest.
 - `webtest.cancelled`: emitted when cancellation is requested and observed.
 
 The same `run.cancel` method cancels either a load test or a standalone WebTest. Only one local execution of either kind may be active at a time.
+
+### webtest.continue
+
+Resumes a standalone WebTest that is paused at a YAML request breakpoint. The `runId` must match the active `webtest.run`.
+
+Request:
+
+```json
+{"jsonrpc":"2.0","id":5,"method":"webtest.continue","params":{"runId":"<run-id>"}}
+```
+
+Response:
+
+```json
+{"jsonrpc":"2.0","id":5,"result":{"accepted":true,"runId":"<run-id>"}}
+```
+
+The Host returns error `-32003` if the WebTest is not currently paused at a breakpoint. Cancellation remains available while paused.
 
 ### run.cancel
 
