@@ -197,6 +197,7 @@ Standard errors:
 Host-specific errors:
 - `-32001`: another local run is already active;
 - `-32002`: no active run exists for the supplied run id.
+- `-32003`: the WebTest is not paused at a request breakpoint.
 
 ## Scope of this version
 
