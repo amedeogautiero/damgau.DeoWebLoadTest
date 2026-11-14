@@ -1,4 +1,4 @@
-export type DebugSessionStatus = "idle" | "running" | "completed" | "failed" | "cancelled";
+export type DebugSessionStatus = "idle" | "running" | "paused" | "completed" | "failed" | "cancelled";
 export type DebugRequestStatus = "pending" | "succeeded" | "failed";
 export type DebugStepType = "Request" | "Code" | "Extractor" | "Validator";
 export interface DebugStep {
@@ -172,6 +172,9 @@ export class WebTestDebugSession {
       case "VariablesUpdated":
         this.updateVariable(event.variableName, event.variableValue);
         break;
+      case "BreakpointReached":
+        this.currentStatus = "paused";
+        break;
       case "TestCompleted":
         this.currentStatus = event.success ? "completed" : "failed";
         this.currentFinishedAt = event.timestampUtc ?? new Date().toISOString();
@@ -193,6 +196,10 @@ export class WebTestDebugSession {
       elapsedMs: result.elapsedMs,
       requests: result.requests ?? this.requestItems.length
     };
+  }
+
+  resume(): void {
+    if (this.currentStatus === "paused") this.currentStatus = "running";
   }
 
   cancel(): void {
