@@ -133,6 +133,24 @@ export class WebTestDebugSession {
     this.stepItems.length = 0;
   }
 
+  prepare(testName?: string): void {
+    this.nextRequestId = 1;
+    this.nextStepId = 1;
+    this.requestItems.length = 0;
+    this.stepItems.length = 0;
+    this.currentStatus = "idle";
+    this.currentRunId = undefined;
+    this.currentTestName = testName;
+    this.currentStartedAt = undefined;
+    this.currentFinishedAt = undefined;
+    this.currentContext = undefined;
+    this.currentSummary = undefined;
+    this.totalRequestCount = 0;
+    this.successfulRequestCount = 0;
+    this.failedRequestCount = 0;
+    this.requestDurationValues.length = 0;
+  }
+
   applyExecutionEvent(event: WebTestExecutionEvent): void {
     if (event.stepType && event.stepName) this.applyStepEvent(event);
     switch (event.eventType) {
