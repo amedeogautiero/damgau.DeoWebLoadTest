@@ -406,7 +406,7 @@ export function activate(context: vscode.ExtensionContext): void {
       const activeEditor = vscode.window.activeTextEditor;
       const activeDocument = activeEditor?.document;
       const activeIsWebTest = activeDocument?.uri.scheme === "file" &&
-        /\\.webtest\\.ya?ml$/i.test(activeDocument.fileName);
+        /\.webtest\.ya?ml$/i.test(activeDocument.fileName);
 
       if (activeIsWebTest && activeDocument) {
         if (activeDocument.isDirty) {
@@ -430,6 +430,9 @@ export function activate(context: vscode.ExtensionContext): void {
         selectedUri = selection[0];
       }
 
+      const webTestUri = selectedUri;
+      if (!webTestUri) return;
+
       webTestStarting = true;
       try {
         runOutput.clear();
@@ -438,7 +441,7 @@ export function activate(context: vscode.ExtensionContext): void {
         webTestFailureDetails = [];
         webTestSuccessfulRequests = 0;
         webTestFailedRequests = 0;
-        runOutput.appendLine(`Starting WebTest: ${selectedUri.fsPath}`);
+        runOutput.appendLine(`Starting WebTest: ${webTestUri.fsPath}`);
         runOutput.appendLine("");
 
         // Individua il progetto WebTest che contiene il file selezionato.
@@ -446,7 +449,7 @@ export function activate(context: vscode.ExtensionContext): void {
           "**/LoadTest.WebTestSample.csproj",
           "**/{bin,obj,node_modules}/**"
         );
-        const selectedFile = path.resolve(selectedUri.fsPath);
+        const selectedFile = path.resolve(webTestUri.fsPath);
         const matchingProjects = projects.filter(project => {
           const projectDirectory = path.dirname(project.fsPath);
           const relative = path.relative(projectDirectory, selectedFile);
