@@ -218,7 +218,8 @@ export function activate(context: vscode.ExtensionContext): void {
         const isRequestEvent = event.stepType === "Request" ||
           event.eventType === "RequestStarted" ||
           event.eventType === "RequestCompleted" ||
-          event.eventType === "RequestFailed";
+          event.eventType === "RequestFailed" ||
+          (Boolean(event.requestId) && (event.stepType === "Extractor" || event.stepType === "Validator"));
         if (isRequestEvent) {
           requestExplorer.refresh();
           requestInspector.update(webTestDebugSession.requests, webTestDebugSession.steps);
