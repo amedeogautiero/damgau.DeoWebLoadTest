@@ -98,6 +98,7 @@ export class WebTestDebugSession {
   private successfulRequestCount = 0;
   private failedRequestCount = 0;
   private readonly requestDurationValues: number[] = [];
+  private readonly pausedEngineRequestIds = new Set<string>();
 
   get status(): DebugSessionStatus { return this.currentStatus; }
   get runId(): string | undefined { return this.currentRunId; }
@@ -129,6 +130,7 @@ export class WebTestDebugSession {
     this.successfulRequestCount = 0;
     this.failedRequestCount = 0;
     this.requestDurationValues.length = 0;
+    this.pausedEngineRequestIds.clear();
   }
 
   setRunId(runId: string): void {
@@ -156,6 +158,7 @@ export class WebTestDebugSession {
     this.successfulRequestCount = 0;
     this.failedRequestCount = 0;
     this.requestDurationValues.length = 0;
+    this.pausedEngineRequestIds.clear();
   }
 
   applyExecutionEvent(event: WebTestExecutionEvent): void {
@@ -212,15 +215,20 @@ export class WebTestDebugSession {
         this.requestItems[index] = { ...request, status: "pending" };
       }
     }
+    this.pausedEngineRequestIds.clear();
   }
 
   private pauseRequest(engineRequestId?: string): void {
     if (!engineRequestId) return;
+    // A breakpoint can be reported before RequestStarted creates the request row.
+    // Remember the engine ID so the row is created as paused when that event arrives.
+    this.pausedEngineRequestIds.add(engineRequestId);
     const index = this.requestItems.findIndex(request =>
       request.engineRequestId === engineRequestId
     );
-    if (index < 0) return;
-    this.requestItems[index] = { ...this.requestItems[index], status: "paused" };
+    if (index >= 0) {
+      this.requestItems[index] = { ...this.requestItems[index], status: "paused" };
+    }
   }
 
   cancel(): void {
@@ -245,7 +253,7 @@ export class WebTestDebugSession {
       requestHeaders: event.requestHeaders,
       requestBody: event.requestBody,
       contextAtStart: event.contextSnapshot,
-      status: "pending"
+      status: this.pausedEngineRequestIds.has(event.requestId ?? "") ? "paused" : "pending"
     });
     const request = this.requestItems[this.requestItems.length - 1];
     this.addStep("Request", event.requestName ?? "HTTP request", "pending", event.timestampUtc, undefined, event, request.id);
