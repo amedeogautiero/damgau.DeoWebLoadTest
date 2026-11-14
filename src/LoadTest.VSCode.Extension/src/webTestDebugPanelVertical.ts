@@ -21,7 +21,8 @@ export class WebTestDebugPanelVertical implements vscode.Disposable, vscode.Webv
     private readonly onStop: () => void,
     private readonly onClear: () => void,
     private readonly onHostStart: () => void,
-    private readonly onHostStop: () => void
+    private readonly onHostStop: () => void,
+    private readonly onContinue: () => void
   ) {}
 
   // Legacy editor panel is intentionally retained as a fallback.
@@ -94,6 +95,8 @@ export class WebTestDebugPanelVertical implements vscode.Disposable, vscode.Webv
       this.onHostStart();
     } else if (message?.command === "hostStop") {
       this.onHostStop();
+    } else if (message?.command === "continue") {
+      this.onContinue();
     } else if (
       message?.command === "select" &&
       typeof message.requestId === "number" &&
@@ -226,7 +229,7 @@ export class WebTestDebugPanelVertical implements vscode.Disposable, vscode.Webv
   <div><h1>DeoLoadTest Debug Panel - Vertical</h1><div class="test-name" id="test-name">No WebTest selected</div></div>
   <div class="toolbar">
     <button id="host-start" hidden>▶ Start Host</button><button id="host-stop" class="danger" hidden>■ Stop Host</button>
-    <button id="run">▶ Run</button><button id="debug">🐞 Debug</button><button id="stop" class="danger" disabled>■ Stop</button>
+    <button id="run">▶ Run</button><button id="debug">🐞 Debug</button><button id="continue" hidden>▶ Continue</button><button id="stop" class="danger" disabled>■ Stop</button>
     <button id="clear" disabled>Clear</button><span id="status" class="status muted"><i></i>Idle</span>
   </div>
 </header>
@@ -566,8 +569,9 @@ export class WebTestDebugPanelVertical implements vscode.Disposable, vscode.Webv
     const label = state.status.charAt(0).toUpperCase() + state.status.slice(1);
     status.className = "status " + (state.status === "completed" ? "success" : state.status === "failed" ? "failure" : state.status === "running" ? "running" : "muted");
     status.replaceChildren(element("i"), document.createTextNode(label));
-    document.getElementById("run").disabled = state.status === "running";
-    document.getElementById("stop").disabled = state.status !== "running";
+    document.getElementById("run").disabled = state.status === "running" || state.status === "paused";
+    document.getElementById("continue").hidden = state.status !== "paused";
+    document.getElementById("stop").disabled = state.status !== "running" && state.status !== "paused";
     document.getElementById("clear").disabled = state.visibleRequests === 0;
     const failures = document.getElementById("summary-failures");
     failures.replaceChildren();
@@ -589,6 +593,7 @@ export class WebTestDebugPanelVertical implements vscode.Disposable, vscode.Webv
     else if (target.id === "host-stop") vscode.postMessage({ command: "hostStop" });
     else if (target.id === "run") vscode.postMessage({ command: "run" });
     else if (target.id === "debug") vscode.postMessage({ command: "debug" });
+    else if (target.id === "continue") vscode.postMessage({ command: "continue" });
     else if (target.id === "stop") vscode.postMessage({ command: "stop" });
     else if (target.id === "clear") vscode.postMessage({ command: "clear" });
     else if (target.dataset.select) vscode.postMessage({ command: "select", requestId: Number(target.dataset.select) });
