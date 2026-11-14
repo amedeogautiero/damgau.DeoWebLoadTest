@@ -9,8 +9,6 @@ export class WebTestDebugPanelVertical implements vscode.Disposable, vscode.Webv
   private disposed = false;
   private webviewReady = false;
   private readonly sentRequests = new Map<number, DebugRequest>();
-  private lastSentSelectedRequestId: number | undefined;
-  private lastSentSelectedRequest: DebugRequest | null | undefined;
   private readonly durationValues = new Map<number, number>();
   private durationSumMs = 0;
   private durationMinMs = Number.POSITIVE_INFINITY;
@@ -104,8 +102,6 @@ export class WebTestDebugPanelVertical implements vscode.Disposable, vscode.Webv
       const requestId: number = message.requestId;
       this.selectedRequestId = requestId;
       const request = this.sentRequests.get(requestId) ?? null;
-      this.lastSentSelectedRequestId = requestId;
-      this.lastSentSelectedRequest = request;
       void this.webview?.postMessage({ command: "selectedRequest", request, steps: this.session.steps.filter(step => step.requestId === requestId) });
     }
   }
@@ -114,8 +110,6 @@ export class WebTestDebugPanelVertical implements vscode.Disposable, vscode.Webv
     this.selectedRequestId = undefined;
     this.webviewReady = false;
     this.sentRequests.clear();
-    this.lastSentSelectedRequestId = undefined;
-    this.lastSentSelectedRequest = undefined;
     this.resetDurationStats();
   }
 
@@ -161,11 +155,6 @@ export class WebTestDebugPanelVertical implements vscode.Disposable, vscode.Webv
     const selectedRequest = this.selectedRequestId === undefined
       ? null
       : this.sentRequests.get(this.selectedRequestId) ?? null;
-    const selectedChanged = force ||
-      this.selectedRequestId !== this.lastSentSelectedRequestId ||
-      selectedRequest !== this.lastSentSelectedRequest;
-    this.lastSentSelectedRequestId = this.selectedRequestId;
-    this.lastSentSelectedRequest = selectedRequest;
 
     const succeeded = this.session.successfulRequests;
     const failed = this.session.failedRequests;
@@ -196,8 +185,8 @@ export class WebTestDebugPanelVertical implements vscode.Disposable, vscode.Webv
       requests: changedRequests,
       steps: this.session.steps,
       selectedSteps: selectedRequest ? this.session.steps.filter(step => step.requestId === selectedRequest.id) : [],
-      resetRequests,
-      ...(selectedChanged ? { selectedRequest } : {})
+      selectedRequest,
+      resetRequests
     });
   }
 
