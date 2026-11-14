@@ -484,7 +484,7 @@ export function activate(context: vscode.ExtensionContext): void {
         // Clear the previous execution as soon as the new WebTest is accepted for startup.
         webTestDebugSession.prepare(relativeSourceWebTestFile);
         requestExplorer.refresh();
-        requestInspector.update(webTestDebugSession.requests);
+        requestInspector.update(webTestDebugSession.requests, webTestDebugSession.steps);
         timingInspector.update(webTestDebugSession.requests, webTestDebugSession.status);
         debugPanel.update();
         verticalDebugPanel.update();
