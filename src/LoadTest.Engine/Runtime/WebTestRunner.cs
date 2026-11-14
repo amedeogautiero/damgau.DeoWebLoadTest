@@ -18,6 +18,7 @@ public sealed class WebTestRunner(EngineServices services)
         public required WebTestContext Ctx { get; init; }
         public required List<string> Failures { get; init; }
         public string? Transaction { get; set; }
+        public string? ActiveRequestId { get; set; }
         public int Depth { get; init; }
         public string BaseDir => Path.GetDirectoryName(Def.SourcePath) ?? Directory.GetCurrentDirectory();
     }
@@ -231,9 +232,12 @@ public sealed class WebTestRunner(EngineServices services)
             Bind(req, f);
             foreach (var p in services.RequestPlugins) p.PreRequest(req);
 
+            var requestId = Guid.NewGuid().ToString("N");
+            f.ActiveRequestId = requestId;
             Emit(new ExecutionEvent
             {
                 EventType = "RequestStarted",
+                RequestId = requestId,
                 StepType = "Request",
                 StepName = step.Name,
                 StepStatus = "Started",
@@ -282,6 +286,7 @@ public sealed class WebTestRunner(EngineServices services)
         Emit(new ExecutionEvent
         {
             EventType = success ? "RequestCompleted" : "RequestFailed",
+            RequestId = f.ActiveRequestId,
             StepType = "Request",
             StepName = step.Name,
             StepStatus = success ? "Succeeded" : "Failed",
@@ -312,6 +317,7 @@ public sealed class WebTestRunner(EngineServices services)
             },
             Success = success
         });
+        f.ActiveRequestId = null;
 
         if (!success)
         {
@@ -420,6 +426,7 @@ public sealed class WebTestRunner(EngineServices services)
             UserId = f.Ctx.User.UserId,
             Iteration = f.Ctx.Iteration,
             RequestName = f.Transaction,
+            RequestId = f.ActiveRequestId,
             StepDetails = details
         });
     }
