@@ -55,17 +55,25 @@ export class WebTestRequestExplorer implements vscode.TreeDataProvider<DebugRequ
   }
 
   private descriptionFor(request: DebugRequest): string {
-    if (request.status === "pending") return "Running…";
     const parts: string[] = [];
-    if (typeof request.statusCode === "number") {
+    if (request.status === "pending") parts.push("Running…");
+    else if (typeof request.statusCode === "number") {
       parts.push(`${request.statusCode}${request.reasonPhrase ? ` ${request.reasonPhrase}` : ""}`);
     } else if (request.errorType) {
       parts.push(request.errorType);
+    } else {
+      parts.push(request.status === "failed" ? "Failed" : "Completed");
     }
     if (typeof request.elapsedMicros === "number") {
       parts.push(`${(request.elapsedMicros / 1000).toFixed(1)} ms`);
     }
-    return parts.join(" · ") || (request.status === "failed" ? "Failed" : "Completed");
+
+    const childTypes = new Set(this.session.steps
+      .filter(step => step.requestId === request.id)
+      .map(step => step.type));
+    if (childTypes.has("Extractor")) parts.push("🔍");
+    if (childTypes.has("Validator")) parts.push("✓");
+    return parts.join(" · ");
   }
 
   private tooltipFor(request: DebugRequest): vscode.MarkdownString {
