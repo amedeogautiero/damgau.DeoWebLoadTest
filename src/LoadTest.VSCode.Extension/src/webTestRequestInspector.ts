@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { DebugRequest, WebTestContextSnapshot } from "./webTestDebugSession";
+import { DebugRequest, DebugStep, WebTestContextSnapshot } from "./webTestDebugSession";
 
 const MAX_DISPLAY_CHARS = 64 * 1024;
 
@@ -8,7 +8,7 @@ export class WebTestRequestInspector implements vscode.Disposable {
   private currentRequestId: number | undefined;
   private disposed = false;
 
-  show(request: DebugRequest, requests: readonly DebugRequest[]): void {
+  show(request: DebugRequest, requests: readonly DebugRequest[], steps: readonly DebugStep[]): void {
     if (this.disposed) return;
 
     if (!this.panel) {
@@ -32,10 +32,10 @@ export class WebTestRequestInspector implements vscode.Disposable {
 
     this.currentRequestId = request.id;
     this.panel.title = this.titleFor(request);
-    this.panel.webview.html = this.render(request, requests);
+    this.panel.webview.html = this.render(request, requests, steps);
   }
 
-  update(requests: readonly DebugRequest[]): void {
+  update(requests: readonly DebugRequest[], steps: readonly DebugStep[]): void {
     if (!this.panel || this.currentRequestId === undefined) return;
     const request = requests.find(item => item.id === this.currentRequestId);
     if (!request) return;
@@ -47,7 +47,7 @@ export class WebTestRequestInspector implements vscode.Disposable {
     return `Request #${String(request.id).padStart(3, "0")} — ${request.method ?? "HTTP"}`;
   }
 
-  private render(request: DebugRequest, requests: readonly DebugRequest[]): string {
+  private render(request: DebugRequest, requests: readonly DebugRequest[], steps: readonly DebugStep[]): string {
     const status = request.status === "pending"
       ? "Running"
       : request.status === "succeeded"
@@ -65,6 +65,7 @@ export class WebTestRequestInspector implements vscode.Disposable {
     const responseBody = this.formatValue(request.responseBody);
     const definition = this.formatValue(request.requestDefinition);
     const requestContext = this.renderRequestContext(request.contextAtStart, request.contextAtEnd);
+    const childSteps = this.renderChildSteps(request, steps);
     const startOffset = this.startOffsetMs(request, requests);
     const duration = typeof request.elapsedMicros === "number"
       ? `${(request.elapsedMicros / 1000).toFixed(2)} ms`
@@ -136,10 +137,28 @@ export class WebTestRequestInspector implements vscode.Disposable {
   <h2>WebTest definition</h2>
   ${this.section("Original YAML request node (parsed)", definition)}
 
+  ${childSteps}
+
   <h2>Request Context</h2>
   ${requestContext}
 </body>
 </html>`;
+  }
+
+  private renderChildSteps(request: DebugRequest, steps: readonly DebugStep[]): string {
+    const children = steps.filter(step =>
+      step.requestId === request.id && (step.type === "Extractor" || step.type === "Validator")
+    );
+    if (!children.length) return "";
+
+    const rows = children.map(step => {
+      const status = step.status === "succeeded" ? "Succeeded" : step.status === "failed" ? "Failed" : "Running";
+      const css = step.status === "succeeded" ? "success" : step.status === "failed" ? "failure" : "pending";
+      const details = this.formatValue(step.details);
+      const icon = step.type === "Extractor" ? "🔍 Extractor" : "✓ Validator";
+      return `<div class="field"><strong>${icon} — ${this.escapeHtml(step.name)}</strong> <span class="badge ${css}">${status}</span></div>${details.text ? `<pre>${this.escapeHtml(details.text)}${details.truncated ? "\\n\\n[Display truncated at 64 KB]" : ""}</pre>` : ""}`;
+    }).join("");
+    return `<h2>Request steps</h2>${rows}`;
   }
 
   private renderRequestContext(before?: WebTestContextSnapshot, after?: WebTestContextSnapshot): string {
