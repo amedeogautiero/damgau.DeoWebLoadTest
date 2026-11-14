@@ -364,10 +364,15 @@ export class WebTestDebugPanelVertical implements vscode.Disposable, vscode.Webv
         const children = steps.filter(child => child.requestId === step.requestId && (child.type === "Extractor" || child.type === "Validator"));
         if (children.length) {
           const badges = element("span", "step-children");
-          children.forEach(child => {
-            const badge = element("span", "step-child-icon", child.type === "Extractor" ? "🔍" : "✓");
-            badge.title = `${child.type}: ${child.name} (${child.status})`;
-            badge.classList.add(child.status === "failed" ? "failure" : child.status === "succeeded" ? "success" : "muted");
+          (["Extractor", "Validator"]).forEach(type => {
+            const matching = children.filter(child => child.type === type);
+            if (!matching.length) return;
+            const status = matching.some(child => child.status === "failed")
+              ? "failed"
+              : matching.every(child => child.status === "succeeded") ? "succeeded" : "pending";
+            const badge = element("span", "step-child-icon", type === "Extractor" ? "🔍" : "✓");
+            badge.title = `${type}: ${matching.map(child => child.name).join(", ")}`;
+            badge.classList.add(status === "failed" ? "failure" : status === "succeeded" ? "success" : "muted");
             badges.appendChild(badge);
           });
           main.appendChild(badges);
