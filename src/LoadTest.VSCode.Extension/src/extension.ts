@@ -146,6 +146,10 @@ export function activate(context: vscode.ExtensionContext): void {
       if (!runId) return;
       void communicationClient.continueWebTest(runId).then(() => {
         webTestDebugSession.resume();
+        requestExplorer.refresh();
+        requestInspector.update(webTestDebugSession.requests, webTestDebugSession.steps);
+        timingInspector.update(webTestDebugSession.requests, webTestDebugSession.status);
+        debugPanel.update();
         verticalDebugPanel.update();
         runOutput.appendLine("Breakpoint resumed.");
       }).catch(error => {
@@ -231,6 +235,7 @@ export function activate(context: vscode.ExtensionContext): void {
           event.eventType === "RequestStarted" ||
           event.eventType === "RequestCompleted" ||
           event.eventType === "RequestFailed" ||
+          event.eventType === "BreakpointReached" ||
           (Boolean(event.requestId) && (event.stepType === "Extractor" || event.stepType === "Validator"));
         if (isRequestEvent) {
           requestExplorer.refresh();
