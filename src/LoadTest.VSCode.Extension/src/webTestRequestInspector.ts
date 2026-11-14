@@ -40,7 +40,7 @@ export class WebTestRequestInspector implements vscode.Disposable {
     const request = requests.find(item => item.id === this.currentRequestId);
     if (!request) return;
     this.panel.title = this.titleFor(request);
-    this.panel.webview.html = this.render(request, requests);
+    this.panel.webview.html = this.render(request, requests, steps);
   }
 
   private titleFor(request: DebugRequest): string {
