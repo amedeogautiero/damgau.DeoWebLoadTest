@@ -140,7 +140,19 @@ export function activate(context: vscode.ExtensionContext): void {
     () => { void vscode.commands.executeCommand("deoloadtest.stopWebTest"); },
     () => { void vscode.commands.executeCommand("deoloadtest.clearRequestExplorer"); },
     () => { void vscode.commands.executeCommand("deoloadtest.startHost"); },
-    () => { void vscode.commands.executeCommand("deoloadtest.stopHost"); }
+    () => { void vscode.commands.executeCommand("deoloadtest.stopHost"); },
+    () => {
+      const runId = activeWebTestRunId;
+      if (!runId) return;
+      void communicationClient.continueWebTest(runId).then(() => {
+        webTestDebugSession.resume();
+        verticalDebugPanel.update();
+        runOutput.appendLine("Breakpoint resumed.");
+      }).catch(error => {
+        const message = error instanceof Error ? error.message : String(error);
+        void vscode.window.showErrorMessage("Unable to continue WebTest: " + message);
+      });
+    }
   );
   const requestExplorerView = vscode.window.createTreeView("deoloadtest.requestExplorer", {
     treeDataProvider: requestExplorer,
@@ -398,7 +410,7 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   const executeWebTest = async (attachDebugger: boolean): Promise<void> => {
-      if (webTestStarting || webTestDebugSession.status === "running") {
+      if (webTestStarting || webTestDebugSession.status === "running" || webTestDebugSession.status === "paused") {
         void vscode.window.showWarningMessage("A WebTest is already running or starting.");
         return;
       }
@@ -545,7 +557,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
         const relativeWebTestFile = path.relative(outputDirectory, packagedWebTestFile);
         runOutput.appendLine(`Loading WebTest package: ${outputDirectory}`);
-        const result = await communicationClient.startWebTest(outputDirectory, relativeWebTestFile, true);
+        const result = await communicationClient.startWebTest(outputDirectory, relativeWebTestFile, attachDebugger);
         activeRunId = result.runId;
         activeWebTestRunId = result.runId;
         webTestDebugSession.start(result.runId, new Date().toISOString(), relativeSourceWebTestFile);
