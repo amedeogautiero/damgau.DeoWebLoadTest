@@ -48,6 +48,7 @@ export class CommunicationClient implements vscode.Disposable {
   private readonly notificationListeners = new Set<(notification: HostNotification) => void>();
   private readonly stdoutSubscription: vscode.Disposable;
   private readonly output = vscode.window.createOutputChannel("DeoLoadTest Communication");
+  private readonly rpcOutput = vscode.window.createOutputChannel("DeoLoadTest RPC");
 
   constructor(private readonly host: HostManager) {
     this.stdoutSubscription = this.host.onStdout((chunk) => this.handleStdout(chunk));
@@ -119,7 +120,9 @@ export class CommunicationClient implements vscode.Disposable {
       });
 
       try {
-        this.host.send({ jsonrpc: "2.0", id, method, params });
+        const message = { jsonrpc: "2.0", id, method, params };
+        this.logRpc("EXTENSION → HOST", message);
+        this.host.send(message);
       } catch (error) {
         clearTimeout(timer);
         this.pending.delete(id);
@@ -147,6 +150,8 @@ export class CommunicationClient implements vscode.Disposable {
         continue;
       }
 
+      this.logRpc("HOST → EXTENSION", message);
+
       if ("id" in message && typeof message.id === "number") {
         const pending = this.pending.get(message.id);
         if (!pending) continue;
@@ -167,6 +172,12 @@ export class CommunicationClient implements vscode.Disposable {
     }
   }
 
+  private logRpc(direction: string, message: unknown): void {
+    this.rpcOutput.appendLine(`[${new Date().toISOString()}] ${direction}`);
+    this.rpcOutput.appendLine(JSON.stringify(message, null, 2));
+    this.rpcOutput.appendLine("");
+  }
+
   dispose(): void {
     this.stdoutSubscription.dispose();
     for (const pending of this.pending.values()) {
@@ -176,5 +187,6 @@ export class CommunicationClient implements vscode.Disposable {
     this.pending.clear();
     this.notificationListeners.clear();
     this.output.dispose();
+    this.rpcOutput.dispose();
   }
 }
