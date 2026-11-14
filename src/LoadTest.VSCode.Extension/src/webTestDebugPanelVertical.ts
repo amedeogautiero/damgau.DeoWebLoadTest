@@ -371,7 +371,7 @@ export class WebTestDebugPanelVertical implements vscode.Disposable, vscode.Webv
               ? "failed"
               : matching.every(child => child.status === "succeeded") ? "succeeded" : "pending";
             const badge = element("span", "step-child-icon", type === "Extractor" ? "🔍" : "✓");
-            badge.title = `${type}: ${matching.map(child => child.name).join(", ")}`;
+            badge.title = type + ": " + matching.map(child => child.name).join(", ");
             badge.classList.add(status === "failed" ? "failure" : status === "succeeded" ? "success" : "muted");
             badges.appendChild(badge);
           });
