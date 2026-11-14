@@ -131,6 +131,10 @@ export class WebTestDebugSession {
     this.requestDurationValues.length = 0;
   }
 
+  setRunId(runId: string): void {
+    this.currentRunId = runId;
+  }
+
   clearRequests(): void {
     this.requestItems.length = 0;
     this.stepItems.length = 0;
