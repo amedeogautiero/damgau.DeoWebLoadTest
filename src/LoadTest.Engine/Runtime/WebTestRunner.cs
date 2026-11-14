@@ -253,6 +253,28 @@ public sealed class WebTestRunner(EngineServices services)
                 ContextSnapshot = CaptureContextSnapshot(f.Ctx)
             });
 
+            if (step.Breakpoint && services.DebugMode && services.WaitForContinue is not null)
+            {
+                await services.WaitForContinue(new ExecutionEvent
+                {
+                    EventType = "BreakpointReached",
+                    RequestId = requestId,
+                    StepType = "Request",
+                    StepName = step.Name,
+                    StepStatus = "Started",
+                    ScenarioName = f.Ctx.User.ScenarioName,
+                    TestName = f.Ctx.TestName,
+                    UserId = f.Ctx.User.UserId,
+                    Iteration = f.Ctx.Iteration,
+                    RequestName = step.Name,
+                    Method = req.Method,
+                    Url = req.Url,
+                    RequestHeaders = new Dictionary<string, string>(req.Headers, StringComparer.OrdinalIgnoreCase),
+                    RequestBody = req.Body,
+                    ContextSnapshot = CaptureContextSnapshot(f.Ctx)
+                }, ct);
+            }
+
             var requestStopwatch = Stopwatch.StartNew();
             try { resp = await services.Http.SendAsync(req, ct); }
             catch (TimeoutException ex) { errorType = "Timeout"; errorMessage = ex.Message; exceptionDetails = FormatExceptionChain(ex); }
