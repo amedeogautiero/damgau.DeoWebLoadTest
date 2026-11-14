@@ -77,6 +77,7 @@ public sealed class RequestStep : StepDef
     public string DependentRequests { get; set; } = "auto";
     public int? ThinkTimeMs { get; set; }
     public int? ExpectedStatus { get; set; }
+    public bool Breakpoint { get; set; }
     public List<RuleDef> Extract { get; set; } = [];
     public List<RuleDef> Validate { get; set; } = [];
 }
