@@ -21,6 +21,7 @@ internal sealed class StdioJsonRpcServer(TextReader input, TextWriter output, Te
         public string RunId { get; } = runId;
         public CancellationTokenSource Cancellation { get; } = new();
         public Task Task { get; set; } = Task.CompletedTask;
+        public TaskCompletionSource<bool>? ContinueSignal { get; set; }
     }
 
     private sealed class StartRunParams
@@ -55,6 +56,13 @@ internal sealed class StdioJsonRpcServer(TextReader input, TextWriter output, Te
     private sealed class CancelRunParams
     {
         public CancelRunParams() { }
+
+        public string RunId { get; set; } = "";
+    }
+
+    private sealed class ContinueRunParams
+    {
+        public ContinueRunParams() { }
 
         public string RunId { get; set; } = "";
     }
@@ -188,6 +196,21 @@ internal sealed class StdioJsonRpcServer(TextReader input, TextWriter output, Te
                     break;
                 }
 
+                case "webtest.continue":
+                {
+                    var request = parameters.ValueKind == JsonValueKind.Undefined
+                        ? new ContinueRunParams()
+                        : JsonSerializer.Deserialize<ContinueRunParams>(parameters.GetRawText(), JsonOptions)
+                            ?? throw new RpcException(-32602, "Invalid params");
+
+                    if (string.IsNullOrWhiteSpace(request.RunId))
+                        throw new RpcException(-32602, "runId is required");
+
+                    ContinueRun(request.RunId);
+                    WriteResult(id, new { accepted = true, runId = request.RunId });
+                    break;
+                }
+
                 case "script.compile":
                 {
                     var request = parameters.ValueKind == JsonValueKind.Undefined
@@ -310,6 +333,34 @@ internal sealed class StdioJsonRpcServer(TextReader input, TextWriter output, Te
                     runId = active.RunId,
                     @event = executionEvent
                 });
+            }, request.DebugMode, async (breakpointEvent, ct) =>
+            {
+                var signal = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                lock (_runGate)
+                {
+                    if (!ReferenceEquals(_activeRun, active))
+                        throw new OperationCanceledException(ct);
+                    active.ContinueSignal = signal;
+                }
+
+                WriteNotification("webtest.event", new
+                {
+                    runId = active.RunId,
+                    @event = breakpointEvent
+                });
+
+                try
+                {
+                    await signal.Task.WaitAsync(ct);
+                }
+                finally
+                {
+                    lock (_runGate)
+                    {
+                        if (ReferenceEquals(active.ContinueSignal, signal))
+                            active.ContinueSignal = null;
+                    }
+                }
             });
             var runner = new WebTestRunner(services);
 
@@ -422,6 +473,19 @@ internal sealed class StdioJsonRpcServer(TextReader input, TextWriter output, Te
             assemblyBytes = compiled.Assembly.Length,
             pdbBytes = pdb.Length
         };
+    }
+
+    private void ContinueRun(string runId)
+    {
+        lock (_runGate)
+        {
+            if (_activeRun is null || !string.Equals(_activeRun.RunId, runId, StringComparison.Ordinal))
+                throw new RpcException(-32002, $"No active run found with id '{runId}'.");
+
+            var signal = _activeRun.ContinueSignal;
+            if (signal is null || !signal.TrySetResult(true))
+                throw new RpcException(-32003, "The WebTest is not paused at a breakpoint.");
+        }
     }
 
     private void CancelRun(string runId)
