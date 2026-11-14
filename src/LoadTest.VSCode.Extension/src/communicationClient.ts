@@ -89,6 +89,10 @@ export class CommunicationClient implements vscode.Disposable {
     return this.request<{ accepted: boolean; runId: string }>("run.cancel", { runId });
   }
 
+  async continueWebTest(runId: string): Promise<{ accepted: boolean; runId: string }> {
+    return this.request<{ accepted: boolean; runId: string }>("webtest.continue", { runId });
+  }
+
   async compileScript(sourcePath: string, outputDirectory?: string): Promise<ScriptCompileResult> {
     return this.request<ScriptCompileResult>(
       "script.compile",
