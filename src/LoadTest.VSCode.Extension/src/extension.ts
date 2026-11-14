@@ -149,7 +149,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const requestSelectionSubscription = requestExplorerView.onDidChangeSelection(({ selection }) => {
     const selectedRequest = selection[0];
     if (selectedRequest && (selectedRequest as vscode.TreeItem).contextValue !== "deoloadtest.testHeader") {
-      requestInspector.show(selectedRequest as import("./webTestDebugSession").DebugRequest, webTestDebugSession.requests);
+      requestInspector.show(selectedRequest as import("./webTestDebugSession").DebugRequest, webTestDebugSession.requests, webTestDebugSession.steps);
     }
   });
   let webTestRequestRows: string[] = [];
@@ -221,7 +221,7 @@ export function activate(context: vscode.ExtensionContext): void {
           event.eventType === "RequestFailed";
         if (isRequestEvent) {
           requestExplorer.refresh();
-          requestInspector.update(webTestDebugSession.requests);
+          requestInspector.update(webTestDebugSession.requests, webTestDebugSession.steps);
           timingInspector.update(webTestDebugSession.requests, webTestDebugSession.status);
           debugPanel.update();
         }
