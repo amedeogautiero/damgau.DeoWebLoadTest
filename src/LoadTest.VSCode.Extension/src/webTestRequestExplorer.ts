@@ -50,6 +50,7 @@ export class WebTestRequestExplorer implements vscode.TreeDataProvider<DebugRequ
     switch (status) {
       case "succeeded": return new vscode.ThemeIcon("check", new vscode.ThemeColor("testing.iconPassed"));
       case "failed": return new vscode.ThemeIcon("error", new vscode.ThemeColor("testing.iconFailed"));
+      case "paused": return new vscode.ThemeIcon("debug-pause", new vscode.ThemeColor("charts.yellow"));
       default: return new vscode.ThemeIcon("clock", new vscode.ThemeColor("descriptionForeground"));
     }
   }
@@ -57,6 +58,7 @@ export class WebTestRequestExplorer implements vscode.TreeDataProvider<DebugRequ
   private descriptionFor(request: DebugRequest): string {
     const parts: string[] = [];
     if (request.status === "pending") parts.push("Running…");
+    else if (request.status === "paused") parts.push("Paused");
     else if (typeof request.statusCode === "number") {
       parts.push(`${request.statusCode}${request.reasonPhrase ? ` ${request.reasonPhrase}` : ""}`);
     } else if (request.errorType) {
