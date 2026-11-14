@@ -10,6 +10,8 @@ public sealed record ExecutionEvent
     public int? UserId { get; init; }
     public int? Iteration { get; init; }
     public string? RequestName { get; init; }
+    /// <summary>Identificatore univoco della singola richiesta HTTP, condiviso con i relativi Extractor e Validator.</summary>
+    public string? RequestId { get; init; }
     /// <summary>Categoria dello step visualizzato nel debugger: Request, Code, Extractor o Validator.</summary>
     public string? StepType { get; init; }
     /// <summary>Nome leggibile dello step, della regola o del codice eseguito.</summary>
