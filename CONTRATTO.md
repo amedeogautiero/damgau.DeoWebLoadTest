@@ -89,6 +89,7 @@ steps:
       dependentRequests: auto   # auto | none
     thinkTimeMs: 2000
     expectedStatus: 200
+    breakpoint: true       # sospende prima dell'invio, solo in modalità Debug
     extract:
       - { name: csrf, type: regex, pattern: 'name="csrf" value="(.+?)"', group: 1, required: true }
       # altri type: text (delimitatori), attribute, hidden, header, formField, custom
