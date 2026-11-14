@@ -217,7 +217,7 @@ export class WebTestDebugSession {
   private pauseRequest(engineRequestId?: string): void {
     if (!engineRequestId) return;
     const index = this.requestItems.findIndex(request =>
-      request.engineRequestId === engineRequestId && request.status === "pending"
+      request.engineRequestId === engineRequestId
     );
     if (index < 0) return;
     this.requestItems[index] = { ...this.requestItems[index], status: "paused" };
