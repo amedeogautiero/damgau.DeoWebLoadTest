@@ -204,6 +204,51 @@ public class EngineTests
     }
 
     [Fact]
+    public async Task Runner_waits_at_request_breakpoint_only_in_debug_mode()
+    {
+        const string yaml = """
+            version: 1
+            baseUrl: https://x.it
+            steps:
+              - name: Pausa
+                request: { method: GET, url: / }
+                breakpoint: true
+            """;
+        var definition = WebTestLoader.Load(new StringReader(yaml));
+        var http = new FakeHttp();
+        var paused = false;
+        var debugRunner = new WebTestRunner(new EngineServices
+        {
+            Http = http,
+            DebugMode = true,
+            WaitForContinue = (_, _) =>
+            {
+                Assert.Empty(http.Sent); // la richiesta non è ancora stata inviata
+                paused = true;
+                return Task.CompletedTask;
+            }
+        });
+
+        var debugResult = await debugRunner.RunAsync(definition, NewCtx());
+
+        Assert.True(debugResult.Success);
+        Assert.True(paused);
+        Assert.Single(http.Sent);
+
+        var normalHttp = new FakeHttp();
+        var normalRunner = new WebTestRunner(new EngineServices
+        {
+            Http = normalHttp,
+            DebugMode = false,
+            WaitForContinue = (_, _) => throw new InvalidOperationException("Breakpoint must be ignored outside debug mode.")
+        });
+        var normalResult = await normalRunner.RunAsync(definition, NewCtx());
+
+        Assert.True(normalResult.Success);
+        Assert.Single(normalHttp.Sent);
+    }
+
+    [Fact]
     public async Task Validation_level_filters_rules()
     {
         const string yaml = """
