@@ -140,6 +140,7 @@ public static class WebTestLoader
                 DependentRequests = Str(rm, "dependentRequests") ?? "auto",
                 ThinkTimeMs = Int(m, "thinkTimeMs"),
                 ExpectedStatus = Int(m, "expectedStatus"),
+                Breakpoint = Bool(m, "breakpoint") ?? false,
                 Extract = ParseRules(Child(m, "extract"), isExtraction: true, origin),
                 Validate = ParseRules(Child(m, "validate"), isExtraction: false, origin)
             };
