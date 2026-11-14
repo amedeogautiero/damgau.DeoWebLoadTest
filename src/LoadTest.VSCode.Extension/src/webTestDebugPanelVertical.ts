@@ -106,7 +106,7 @@ export class WebTestDebugPanelVertical implements vscode.Disposable, vscode.Webv
       const request = this.sentRequests.get(requestId) ?? null;
       this.lastSentSelectedRequestId = requestId;
       this.lastSentSelectedRequest = request;
-      void this.webview?.postMessage({ command: "selectedRequest", request });
+      void this.webview?.postMessage({ command: "selectedRequest", request, steps: this.session.steps.filter(step => step.requestId === requestId) });
     }
   }
 
@@ -195,6 +195,7 @@ export class WebTestDebugPanelVertical implements vscode.Disposable, vscode.Webv
       failures: this.session.summary?.failures ?? [],
       requests: changedRequests,
       steps: this.session.steps,
+      selectedSteps: selectedRequest ? this.session.steps.filter(step => step.requestId === selectedRequest.id) : [],
       resetRequests,
       ...(selectedChanged ? { selectedRequest } : {})
     });
@@ -350,8 +351,9 @@ export class WebTestDebugPanelVertical implements vscode.Disposable, vscode.Webv
     list.replaceChildren();
     rows.clear();
     allocatedSlots = 0;
-    const icons = { Request: "🌐", Code: "C#", Extractor: "🔍", Validator: "✓" };
-    steps.forEach(step => {
+    const icons = { Request: "🌐", Code: "C#" };
+    const mainSteps = steps.filter(step => step.type === "Request" || step.type === "Code");
+    mainSteps.forEach(step => {
       const row = element("button", "request-row");
       row.type = "button";
       row.disabled = !step.requestId;
@@ -369,6 +371,19 @@ export class WebTestDebugPanelVertical implements vscode.Disposable, vscode.Webv
         if (step.url) row.title = step.url;
       }
       main.appendChild(label);
+      if (step.type === "Request") {
+        const children = steps.filter(child => child.requestId === step.requestId && (child.type === "Extractor" || child.type === "Validator"));
+        if (children.length) {
+          const badges = element("span", "step-children");
+          children.forEach(child => {
+            const badge = element("span", "step-child-icon", child.type === "Extractor" ? "🔍" : "✓");
+            badge.title = `${child.type}: ${child.name} (${child.status})`;
+            badge.classList.add(child.status === "failed" ? "failure" : child.status === "succeeded" ? "success" : "muted");
+            badges.appendChild(badge);
+          });
+          main.appendChild(badges);
+        }
+      }
       const meta = element("span", "request-meta");
       const status = step.status === "succeeded" ? "Succeeded" : step.status === "failed" ? "Failed" : "Running";
       meta.appendChild(element("span", step.status === "succeeded" ? "success" : step.status === "failed" ? "failure" : "muted", status));
@@ -380,7 +395,7 @@ export class WebTestDebugPanelVertical implements vscode.Disposable, vscode.Webv
       list.appendChild(row);
       if (step.requestId) rows.set(step.requestId, row);
     });
-    document.getElementById("request-count").textContent = String(steps.length);
+    document.getElementById("request-count").textContent = String(mainSteps.length);
     selectedRequestId = selectedRequestId;
   }
 
@@ -478,7 +493,7 @@ export class WebTestDebugPanelVertical implements vscode.Disposable, vscode.Webv
     parent.appendChild(table);
   }
 
-  function renderInspector(request) {
+  function renderInspector(request, steps) {
     selectedRequestId = request ? request.id : null;
     document.querySelectorAll(".request-row[data-select]").forEach(row => {
       row.classList.toggle("selected", Number(row.dataset.select) === selectedRequestId);
@@ -513,6 +528,18 @@ export class WebTestDebugPanelVertical implements vscode.Disposable, vscode.Webv
       addBlock(inspector, "Exception chain", request.exceptionDetails);
     }
     addBlock(inspector, "WebTest definition (parsed YAML node)", request.requestDefinition);
+    const childSteps = (steps || []).filter(step => step.requestId === request.id && (step.type === "Extractor" || step.type === "Validator"));
+    if (childSteps.length) {
+      inspector.appendChild(element("h3", "", "Request steps"));
+      childSteps.forEach(step => {
+        const status = step.status === "succeeded" ? "Succeeded" : step.status === "failed" ? "Failed" : "Running";
+        const heading = element("div", "step-child-heading");
+        heading.appendChild(element("strong", "", (step.type === "Extractor" ? "🔍 Extractor" : "✓ Validator") + " — " + step.name));
+        heading.appendChild(element("span", step.status === "succeeded" ? "success" : step.status === "failed" ? "failure" : "muted", status));
+        inspector.appendChild(heading);
+        if (step.details !== undefined) addBlock(inspector, "Details", step.details);
+      });
+    }
     inspector.appendChild(element("h3", "", "Request context"));
     if (!request.contextAtStart && !request.contextAtEnd) {
       inspector.appendChild(element("div", "empty", "Context snapshot not available for this request."));
@@ -576,7 +603,7 @@ export class WebTestDebugPanelVertical implements vscode.Disposable, vscode.Webv
   window.addEventListener("message", function (event) {
     const message = event.data;
     if (message?.command === "selectedRequest") {
-      renderInspector(message.request);
+      renderInspector(message.request, message.steps || []);
       return;
     }
     if (message?.command !== "state") return;
@@ -584,7 +611,7 @@ export class WebTestDebugPanelVertical implements vscode.Disposable, vscode.Webv
     renderSteps(message.steps || []);
     updateSummary(message);
     if (Object.prototype.hasOwnProperty.call(message, "selectedRequest")) {
-      renderInspector(message.selectedRequest || null);
+      renderInspector(message.selectedRequest || null, message.selectedSteps || message.steps || []);
     }
     if (["completed", "failed", "cancelled"].includes(message.status)) {
       document.querySelector(".summary").scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -604,7 +631,7 @@ export class WebTestDebugPanelVertical implements vscode.Disposable, vscode.Webv
       'header{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;border-bottom:1px solid var(--vscode-panel-border);padding:0 0 14px}h1{font-size:1.3em;margin:0 0 4px}.test-name,.muted,.empty{color:var(--vscode-descriptionForeground)}' +
       '.toolbar{display:flex;align-items:center;gap:8px}.toolbar button{padding:5px 12px;color:var(--vscode-button-foreground);background:var(--vscode-button-background);border:0;border-radius:3px;cursor:pointer}.toolbar button:hover{background:var(--vscode-button-hoverBackground)}.toolbar button:disabled{opacity:.45;cursor:default}.toolbar .danger{background:var(--vscode-errorForeground)}' +
       '.status{font-weight:600;margin-left:8px}.status i{display:inline-block;width:8px;height:8px;border-radius:50%;background:currentColor;margin-right:7px}.success{color:var(--vscode-testing-iconPassed)}.failure{color:var(--vscode-testing-iconFailed)}.running{color:var(--vscode-charts-blue)}.warning{color:var(--vscode-editorWarning-foreground)}' +
-      '*{box-sizing:border-box}main{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(180px,38vh) minmax(280px,1fr);gap:14px;height:calc(100vh - 250px);min-height:620px;margin-top:14px}.explorer,.inspector,.summary{border:1px solid var(--vscode-panel-border);border-radius:4px;min-width:0;min-height:0;overflow:hidden}.explorer{display:flex;flex-direction:column}.section-heading{flex:0 0 auto;font-weight:700;font-size:.9em;letter-spacing:.04em;padding:10px 12px;border-bottom:1px solid var(--vscode-panel-border);display:flex;justify-content:space-between}.request-list{flex:1 1 auto;min-height:0;max-height:none;overflow:auto}.request-row{display:flex;flex-direction:column;gap:5px;width:100%;min-height:37px;padding:7px 10px;text-align:left;color:inherit;background:transparent;border:0;border-bottom:1px solid var(--vscode-panel-border)}.request-row:not(:disabled){cursor:pointer}.request-row:not(:disabled):hover,.request-row.selected{background:var(--vscode-list-activeSelectionBackground);color:var(--vscode-list-activeSelectionForeground)}.request-row:disabled{cursor:default;opacity:1}.request-row.empty-row{height:37px;min-height:37px;opacity:.28}.step-icon{display:inline-flex;align-items:center;justify-content:center;min-width:26px;font-weight:700}.step-type{min-width:82px}.step-details{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:55%;color:var(--vscode-descriptionForeground)}.request-main,.request-meta{display:flex;gap:9px;align-items:center;min-width:0}.request-url{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.step-label{display:flex;flex-direction:column;gap:2px;min-width:0;overflow:hidden}.step-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.step-endpoint{font-size:.82em;font-family:var(--vscode-editor-font-family);color:var(--vscode-descriptionForeground);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.timeline-track{position:relative;display:inline-block;flex:0 0 90px;height:8px;background:var(--vscode-editorWidget-background);border-radius:3px;margin-left:auto}.timeline-bar{position:absolute;top:0;height:8px;min-width:2px;border-radius:3px;background:var(--vscode-charts-blue)}.timeline-bar.failed{background:var(--vscode-charts-red)}.timeline-bar.succeeded{background:var(--vscode-charts-green)}.timeline-empty{color:var(--vscode-descriptionForeground);font-size:.8em}.request-id,.request-meta{font-size:.88em;color:var(--vscode-descriptionForeground)}.method{font-weight:700;min-width:42px}.request-meta{padding-left:48px;justify-content:space-between}.inspector{padding-bottom:12px;overflow:auto;max-height:none;position:relative}.inspector>.section-heading{position:sticky;top:0;z-index:2;background:var(--vscode-editor-background)}.inspector-content{padding:12px}.detail-title{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}.url{color:var(--vscode-textLink-foreground);overflow-wrap:anywhere;margin:10px 0}.detail-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;padding:10px 0;border-top:1px solid var(--vscode-panel-border);border-bottom:1px solid var(--vscode-panel-border)}.detail-grid div{display:flex;flex-direction:column;gap:4px}h3{font-size:1em;margin:18px 0 6px}h4{margin:14px 0 6px}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--vscode-textCodeBlock-background);padding:8px;border-radius:3px;margin:6px 0;font-family:var(--vscode-editor-font-family)}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{text-align:left;vertical-align:top;padding:6px;border-bottom:1px solid var(--vscode-panel-border);overflow-wrap:anywhere}td pre{max-height:160px;overflow:auto}.summary{margin-top:14px}.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;padding:12px}.metric{border:1px solid var(--vscode-panel-border);border-radius:3px;padding:9px;display:flex;flex-direction:column;gap:5px}.metric span{font-size:.88em;color:var(--vscode-descriptionForeground)}.metric strong{font-size:1.15em}.summary-footer{display:flex;gap:20px;flex-wrap:wrap;padding:0 12px 12px;color:var(--vscode-descriptionForeground);font-size:.88em}.failures{padding:0 12px 12px;color:var(--vscode-errorForeground)}.empty{padding:14px;font-style:italic}@media(max-width:800px){main{grid-template-columns:1fr}.request-list{max-height:240px}}';
+      '*{box-sizing:border-box}main{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(180px,38vh) minmax(280px,1fr);gap:14px;height:calc(100vh - 250px);min-height:620px;margin-top:14px}.explorer,.inspector,.summary{border:1px solid var(--vscode-panel-border);border-radius:4px;min-width:0;min-height:0;overflow:hidden}.explorer{display:flex;flex-direction:column}.section-heading{flex:0 0 auto;font-weight:700;font-size:.9em;letter-spacing:.04em;padding:10px 12px;border-bottom:1px solid var(--vscode-panel-border);display:flex;justify-content:space-between}.request-list{flex:1 1 auto;min-height:0;max-height:none;overflow:auto}.request-row{display:flex;flex-direction:column;gap:5px;width:100%;min-height:37px;padding:7px 10px;text-align:left;color:inherit;background:transparent;border:0;border-bottom:1px solid var(--vscode-panel-border)}.request-row:not(:disabled){cursor:pointer}.request-row:not(:disabled):hover,.request-row.selected{background:var(--vscode-list-activeSelectionBackground);color:var(--vscode-list-activeSelectionForeground)}.request-row:disabled{cursor:default;opacity:1}.request-row.empty-row{height:37px;min-height:37px;opacity:.28}.step-icon{display:inline-flex;align-items:center;justify-content:center;min-width:26px;font-weight:700}.step-type{min-width:82px}.step-details{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:55%;color:var(--vscode-descriptionForeground)}.request-main,.request-meta{display:flex;gap:9px;align-items:center;min-width:0}.step-children{display:flex;align-items:center;gap:7px;margin-left:auto;flex:0 0 auto}.step-child-icon{font-weight:700}.step-child-heading{display:flex;justify-content:space-between;gap:12px;margin:10px 0 4px}.request-url{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.step-label{display:flex;flex-direction:column;gap:2px;min-width:0;overflow:hidden}.step-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.step-endpoint{font-size:.82em;font-family:var(--vscode-editor-font-family);color:var(--vscode-descriptionForeground);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.timeline-track{position:relative;display:inline-block;flex:0 0 90px;height:8px;background:var(--vscode-editorWidget-background);border-radius:3px;margin-left:auto}.timeline-bar{position:absolute;top:0;height:8px;min-width:2px;border-radius:3px;background:var(--vscode-charts-blue)}.timeline-bar.failed{background:var(--vscode-charts-red)}.timeline-bar.succeeded{background:var(--vscode-charts-green)}.timeline-empty{color:var(--vscode-descriptionForeground);font-size:.8em}.request-id,.request-meta{font-size:.88em;color:var(--vscode-descriptionForeground)}.method{font-weight:700;min-width:42px}.request-meta{padding-left:48px;justify-content:space-between}.inspector{padding-bottom:12px;overflow:auto;max-height:none;position:relative}.inspector>.section-heading{position:sticky;top:0;z-index:2;background:var(--vscode-editor-background)}.inspector-content{padding:12px}.detail-title{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}.url{color:var(--vscode-textLink-foreground);overflow-wrap:anywhere;margin:10px 0}.detail-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;padding:10px 0;border-top:1px solid var(--vscode-panel-border);border-bottom:1px solid var(--vscode-panel-border)}.detail-grid div{display:flex;flex-direction:column;gap:4px}h3{font-size:1em;margin:18px 0 6px}h4{margin:14px 0 6px}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--vscode-textCodeBlock-background);padding:8px;border-radius:3px;margin:6px 0;font-family:var(--vscode-editor-font-family)}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{text-align:left;vertical-align:top;padding:6px;border-bottom:1px solid var(--vscode-panel-border);overflow-wrap:anywhere}td pre{max-height:160px;overflow:auto}.summary{margin-top:14px}.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;padding:12px}.metric{border:1px solid var(--vscode-panel-border);border-radius:3px;padding:9px;display:flex;flex-direction:column;gap:5px}.metric span{font-size:.88em;color:var(--vscode-descriptionForeground)}.metric strong{font-size:1.15em}.summary-footer{display:flex;gap:20px;flex-wrap:wrap;padding:0 12px 12px;color:var(--vscode-descriptionForeground);font-size:.88em}.failures{padding:0 12px 12px;color:var(--vscode-errorForeground)}.empty{padding:14px;font-style:italic}@media(max-width:800px){main{grid-template-columns:1fr}.request-list{max-height:240px}}';
   }
 
   dispose(): void {
