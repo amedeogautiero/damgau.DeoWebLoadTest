@@ -552,7 +552,7 @@ export class WebTestDebugPanelVertical implements vscode.Disposable, vscode.Webv
   function updateSummary(state) {
     const completed = state.successfulRequests + state.failedRequests;
     document.getElementById("test-name").textContent = state.testName;
-    document.getElementById("request-count").textContent = String((state.steps || []).length);
+    document.getElementById("request-count").textContent = String((state.steps || []).filter(step => step.type === "Request" || step.type === "Code").length);
     document.getElementById("metric-requests").textContent = String(state.totalRequests);
     document.getElementById("metric-success").textContent = String(state.successfulRequests);
     const failed = document.getElementById("metric-failed");
