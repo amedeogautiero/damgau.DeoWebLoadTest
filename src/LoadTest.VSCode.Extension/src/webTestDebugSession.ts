@@ -10,6 +10,7 @@ export interface DebugStep {
   readonly completedAt?: string;
   readonly details?: unknown;
   readonly requestId?: number;
+  readonly engineRequestId?: string;
   readonly method?: string;
   readonly url?: string;
 }
@@ -18,6 +19,7 @@ export interface WebTestExecutionEvent {
   eventType?: string;
   timestampUtc?: string;
   requestName?: string;
+  requestId?: string;
   stepType?: DebugStepType;
   stepName?: string;
   stepStatus?: "Started" | "Succeeded" | "Failed";
@@ -51,6 +53,7 @@ export interface WebTestContextSnapshot {
 
 export interface DebugRequest {
   readonly id: number;
+  readonly engineRequestId?: string;
   readonly name?: string;
   readonly startedAt?: string;
   readonly completedAt?: string;
@@ -207,6 +210,7 @@ export class WebTestDebugSession {
     this.requestItems.push({
       id: this.nextRequestId++,
       name: event.requestName,
+      engineRequestId: event.requestId,
       startedAt: event.timestampUtc,
       method: event.method,
       url: event.url,
@@ -222,27 +226,35 @@ export class WebTestDebugSession {
   private applyStepEvent(event: WebTestExecutionEvent): void {
     const type = event.stepType!;
     const name = event.stepName ?? event.requestName ?? type;
+    const parentRequest = event.requestId
+      ? this.requestItems.find(request => request.engineRequestId === event.requestId)
+      : undefined;
+    const localRequestId = parentRequest?.id;
     if (type === "Request") {
-      const index = this.findPendingStep("Request", name);
+      const index = this.findPendingStep("Request", name, event.requestId);
       if (index >= 0) this.updateStep(index, event);
       return;
     }
     if (event.stepStatus === "Started") {
-      this.addStep(type, name, "pending", event.timestampUtc, undefined, event);
+      this.addStep(type, name, "pending", event.timestampUtc, undefined, event, localRequestId);
       return;
     }
-    const index = this.findPendingStep(type, name);
+    const index = this.findPendingStep(type, name, event.requestId, localRequestId);
     if (index >= 0) this.updateStep(index, event);
-    else this.addStep(type, name, event.stepStatus === "Failed" ? "failed" : "succeeded", event.timestampUtc, event.timestampUtc, event);
+    else this.addStep(type, name, event.stepStatus === "Failed" ? "failed" : "succeeded", event.timestampUtc, event.timestampUtc, event, localRequestId);
   }
 
   private addStep(type: DebugStepType, name: string, status: DebugStep["status"], startedAt?: string, completedAt?: string, event?: WebTestExecutionEvent, requestId?: number): void {
-    this.stepItems.push({ id: this.nextStepId++, type, name, status, startedAt, completedAt, details: event?.stepDetails, requestId, method: event?.method, url: event?.url });
+    this.stepItems.push({ id: this.nextStepId++, type, name, status, startedAt, completedAt, details: event?.stepDetails, requestId, engineRequestId: event?.requestId, method: event?.method, url: event?.url });
   }
 
-  private findPendingStep(type: DebugStepType, name: string): number {
+  private findPendingStep(type: DebugStepType, name: string, engineRequestId?: string, requestId?: number): number {
     for (let i = this.stepItems.length - 1; i >= 0; i--) {
-      if (this.stepItems[i].type === type && this.stepItems[i].name === name && this.stepItems[i].status === "pending") return i;
+      const step = this.stepItems[i];
+      if (step.type !== type || step.name !== name || step.status !== "pending") continue;
+      if (engineRequestId && step.engineRequestId !== engineRequestId) continue;
+      if (requestId !== undefined && step.requestId !== requestId) continue;
+      return i;
     }
     return -1;
   }
@@ -257,7 +269,7 @@ export class WebTestDebugSession {
     let index = -1;
     for (let i = this.requestItems.length - 1; i >= 0; i--) {
       const item = this.requestItems[i];
-      if (item.status === "pending" && item.name === event.requestName) {
+      if (item.status === "pending" && (event.requestId ? item.engineRequestId === event.requestId : item.name === event.requestName)) {
         index = i;
         break;
       }
