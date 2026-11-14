@@ -538,6 +538,11 @@
         "expectedStatus": {
           "type": "integer"
         },
+        "breakpoint": {
+          "type": "boolean",
+          "default": false,
+          "description": "Pause before sending this request when the WebTest is launched in Debug mode."
+        },
         "extract": {
           "type": "array",
           "items": {
