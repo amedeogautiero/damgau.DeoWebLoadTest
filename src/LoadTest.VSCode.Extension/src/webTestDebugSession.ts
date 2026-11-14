@@ -1,5 +1,5 @@
 export type DebugSessionStatus = "idle" | "running" | "paused" | "completed" | "failed" | "cancelled";
-export type DebugRequestStatus = "pending" | "succeeded" | "failed";
+export type DebugRequestStatus = "pending" | "paused" | "succeeded" | "failed";
 export type DebugStepType = "Request" | "Code" | "Extractor" | "Validator";
 export interface DebugStep {
   readonly id: number;
@@ -174,6 +174,7 @@ export class WebTestDebugSession {
         break;
       case "BreakpointReached":
         this.currentStatus = "paused";
+        this.pauseRequest(event.requestId);
         break;
       case "TestCompleted":
         this.currentStatus = event.success ? "completed" : "failed";
@@ -199,7 +200,23 @@ export class WebTestDebugSession {
   }
 
   resume(): void {
-    if (this.currentStatus === "paused") this.currentStatus = "running";
+    if (this.currentStatus !== "paused") return;
+    this.currentStatus = "running";
+    for (let index = 0; index < this.requestItems.length; index++) {
+      const request = this.requestItems[index];
+      if (request.status === "paused") {
+        this.requestItems[index] = { ...request, status: "pending" };
+      }
+    }
+  }
+
+  private pauseRequest(engineRequestId?: string): void {
+    if (!engineRequestId) return;
+    const index = this.requestItems.findIndex(request =>
+      request.engineRequestId === engineRequestId && request.status === "pending"
+    );
+    if (index < 0) return;
+    this.requestItems[index] = { ...this.requestItems[index], status: "paused" };
   }
 
   cancel(): void {
