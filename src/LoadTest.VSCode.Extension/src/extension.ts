@@ -562,10 +562,15 @@ export function activate(context: vscode.ExtensionContext): void {
 
         const relativeWebTestFile = path.relative(outputDirectory, packagedWebTestFile);
         runOutput.appendLine(`Loading WebTest package: ${outputDirectory}`);
+
+        // Start tracking before sending the RPC: the Host can emit RequestStarted
+        // immediately, before the startWebTest promise continuation runs.
+        webTestDebugSession.start("pending", new Date().toISOString(), relativeSourceWebTestFile);
+        requestExplorer.refresh();
         const result = await communicationClient.startWebTest(outputDirectory, relativeWebTestFile, attachDebugger);
         activeRunId = result.runId;
         activeWebTestRunId = result.runId;
-        webTestDebugSession.start(result.runId, new Date().toISOString(), relativeSourceWebTestFile);
+        webTestDebugSession.setRunId(result.runId);
         void vscode.commands.executeCommand("setContext", "deoloadtest.webTestRunning", true);
         requestExplorer.refresh();
         timingInspector.update(webTestDebugSession.requests, webTestDebugSession.status);
