@@ -120,6 +120,7 @@ export function activate(context: vscode.ExtensionContext): void {
   registerWebTestValidator(context);
   let activeRunId: string | undefined;
   let activeWebTestRunId: string | undefined;
+  let webTestStarting = false;
   void vscode.commands.executeCommand("setContext", "deoloadtest.webTestRunning", false);
   const webTestDebugSession = new WebTestDebugSession();
   const requestExplorer = new WebTestRequestExplorer(webTestDebugSession);
@@ -396,19 +397,40 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   const executeWebTest = async (attachDebugger: boolean): Promise<void> => {
-      if (webTestDebugSession.status === "running") {
-        void vscode.window.showWarningMessage("A WebTest is already running.");
+      if (webTestStarting || webTestDebugSession.status === "running") {
+        void vscode.window.showWarningMessage("A WebTest is already running or starting.");
         return;
       }
-      const selection = await vscode.window.showOpenDialog({
-        canSelectMany: false,
-        openLabel: "Run WebTest",
-        filters: {
-          "DeoLoadTest WebTest files": ["webtest.yaml", "webtest.yml"]
-        }
-      });
-      if (!selection?.length) return;
 
+      let selectedUri: vscode.Uri | undefined;
+      const activeEditor = vscode.window.activeTextEditor;
+      const activeDocument = activeEditor?.document;
+      const activeIsWebTest = activeDocument?.uri.scheme === "file" &&
+        /\\.webtest\\.ya?ml$/i.test(activeDocument.fileName);
+
+      if (activeIsWebTest && activeDocument) {
+        if (activeDocument.isDirty) {
+          const answer = await vscode.window.showWarningMessage(
+            "Le modifiche non sono state salvate. Vuoi eseguire il test precedentemente salvato?",
+            "Sì",
+            "No"
+          );
+          if (answer !== "Sì") return;
+        }
+        selectedUri = activeDocument.uri;
+      } else {
+        const selection = await vscode.window.showOpenDialog({
+          canSelectMany: false,
+          openLabel: "Run WebTest",
+          filters: {
+            "DeoLoadTest WebTest files": ["webtest.yaml", "webtest.yml"]
+          }
+        });
+        if (!selection?.length) return;
+        selectedUri = selection[0];
+      }
+
+      webTestStarting = true;
       try {
         runOutput.clear();
         runOutput.show(true);
@@ -416,7 +438,7 @@ export function activate(context: vscode.ExtensionContext): void {
         webTestFailureDetails = [];
         webTestSuccessfulRequests = 0;
         webTestFailedRequests = 0;
-        runOutput.appendLine(`Starting WebTest: ${selection[0].fsPath}`);
+        runOutput.appendLine(`Starting WebTest: ${selectedUri.fsPath}`);
         runOutput.appendLine("");
 
         // Individua il progetto WebTest che contiene il file selezionato.
@@ -424,7 +446,7 @@ export function activate(context: vscode.ExtensionContext): void {
           "**/LoadTest.WebTestSample.csproj",
           "**/{bin,obj,node_modules}/**"
         );
-        const selectedFile = path.resolve(selection[0].fsPath);
+        const selectedFile = path.resolve(selectedUri.fsPath);
         const matchingProjects = projects.filter(project => {
           const projectDirectory = path.dirname(project.fsPath);
           const relative = path.relative(projectDirectory, selectedFile);
@@ -453,6 +475,15 @@ export function activate(context: vscode.ExtensionContext): void {
         const projectDirectory = path.dirname(projectPath);
         const outputDirectory = path.join(projectDirectory, "bin", "temp.pkg");
         const webTestsDirectory = path.join(projectDirectory, "webtests");
+        const relativeSourceWebTestFile = path.relative(projectDirectory, selectedFile).split(path.sep).join("/");
+
+        // Clear the previous execution as soon as the new WebTest is accepted for startup.
+        webTestDebugSession.prepare(relativeSourceWebTestFile);
+        requestExplorer.refresh();
+        requestInspector.update(webTestDebugSession.requests);
+        timingInspector.update(webTestDebugSession.requests, webTestDebugSession.status);
+        debugPanel.update();
+        verticalDebugPanel.update();
         const selectedFileName = path.basename(selectedFile);
         const packagedWebTestFile = path.join(outputDirectory, "webtests", selectedFileName);
 
@@ -513,8 +544,7 @@ export function activate(context: vscode.ExtensionContext): void {
         const result = await communicationClient.startWebTest(outputDirectory, relativeWebTestFile, true);
         activeRunId = result.runId;
         activeWebTestRunId = result.runId;
-        const testName = selection[0].fsPath.split(/[\\\\/]/).pop()?.replace(/\\.webtest\\.(yaml|yml)$/i, "") ?? selection[0].fsPath;
-        webTestDebugSession.start(result.runId, new Date().toISOString(), testName);
+        webTestDebugSession.start(result.runId, new Date().toISOString(), relativeSourceWebTestFile);
         void vscode.commands.executeCommand("setContext", "deoloadtest.webTestRunning", true);
         requestExplorer.refresh();
         timingInspector.update(webTestDebugSession.requests, webTestDebugSession.status);
@@ -525,6 +555,8 @@ export function activate(context: vscode.ExtensionContext): void {
         runOutput.appendLine(`Unable to start WebTest: ${message}`);
         void stopWebTestHostAfterRun();
         void vscode.window.showErrorMessage(`Unable to start WebTest: ${message}`);
+      } finally {
+        webTestStarting = false;
       }
   };
 
